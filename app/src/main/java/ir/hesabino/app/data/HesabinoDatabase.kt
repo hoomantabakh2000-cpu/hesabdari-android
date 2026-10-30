@@ -93,6 +93,7 @@ class HesabinoDatabase(context: Context) : SQLiteOpenHelper(
 
 class ProductRepository(context: Context) {
     private val db = HesabinoDatabase(context)
+    private val inventoryLedger = InventoryTransactionRepository(db)
 
     fun getAll(): List<Product> {
         val result = mutableListOf<Product>()
@@ -123,7 +124,7 @@ class ProductRepository(context: Context) {
                     unit = c.getString(unit),
                     purchasePriceRial = c.getLong(purchase),
                     salePriceRial = c.getLong(sale),
-                    stock = InventoryTransactionRepository(db).getCurrentState(productId).quantity,
+                    stock = inventoryLedger.getCurrentState(productId).quantity,
                     minStock = c.getLong(minStock),
                     createdAt = c.getLong(created)
                 )
