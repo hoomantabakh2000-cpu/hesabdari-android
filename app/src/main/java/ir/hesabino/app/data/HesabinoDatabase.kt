@@ -175,6 +175,34 @@ class ProductRepository(context: Context) {
         }
     }
 
+    fun update(product: Product) {
+        require(product.id > 0) { "شناسه کالا نامعتبر است." }
+        require(product.name.isNotBlank()) { "نام کالا الزامی است." }
+        require(product.purchasePriceRial >= 0 && product.salePriceRial >= 0) { "قیمت نمی‌تواند منفی باشد." }
+        require(product.minStock >= 0) { "حداقل موجودی نمی‌تواند منفی باشد." }
+        val values = ContentValues().apply {
+            put("name", product.name.trim())
+            put("barcode", product.barcode.trim())
+            put("unit", product.unit.trim().ifBlank { "عدد" })
+            put("purchase_price_rial", product.purchasePriceRial)
+            put("sale_price_rial", product.salePriceRial)
+            put("min_stock", product.minStock)
+        }
+        db.writableDatabase.update("products", values, "id = ?", arrayOf(product.id.toString()))
+    }
+
+    fun addPurchase(productId: Long, quantity: Long, unitCostRial: Long) {
+        require(quantity > 0) { "تعداد خرید باید بیشتر از صفر باشد." }
+        require(unitCostRial > 0) { "قیمت خرید باید بیشتر از صفر باشد." }
+        inventoryLedger.add(productId, "PURCHASE", quantity, unitCostRial, "MANUAL_PURCHASE")
+        val values = ContentValues().apply { put("purchase_price_rial", unitCostRial) }
+        db.writableDatabase.update("products", values, "id = ?", arrayOf(productId.toString()))
+    }
+
+    fun getInventoryValueRial(): Long = getAll().sumOf { product ->
+        inventoryLedger.getCurrentState(product.id).valueRial
+    }
+
     fun delete(id: Long) {
         val count = db.readableDatabase.query(
             "inventory_transactions",
