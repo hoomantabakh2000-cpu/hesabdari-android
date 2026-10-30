@@ -29,7 +29,9 @@ import ir.hesabino.app.data.ProductRepository
 import java.text.NumberFormat
 import java.util.Locale
 
-private fun toman(rial: Long) = NumberFormat.getNumberInstance(Locale("fa")).format(rial / 10L) + " تومان"\n\nprivate enum class AppSection(val title: String, val symbol: String) {
+private fun toman(rial: Long) = NumberFormat.getNumberInstance(Locale("fa")).format(rial / 10L) + " تومان"
+
+private enum class AppSection(val title: String, val symbol: String) {
     HOME("خانه", "⌂"),
     SALES("فروش", "↗"),
     PURCHASES("خرید", "↙"),
@@ -47,7 +49,9 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HesabinoApp() {
-    var section by rememberSaveable { mutableStateOf(AppSection.HOME) }\n    var refresh by remember { mutableIntStateOf(0) }\n
+    var section by rememberSaveable { mutableStateOf(AppSection.HOME) }
+    var refresh by remember { mutableIntStateOf(0) }
+
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         MaterialTheme(
             colorScheme = lightColorScheme(
@@ -139,7 +143,8 @@ private fun DashboardScreen(refresh: Int, onSales: () -> Unit, onPurchases: () -
             FinanceCard("طلب مشتریان", "۰ تومان", "دریافتنی", Modifier.weight(1f))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            FinanceCard("بدهی تأمین‌کنندگان", "۰ تومان", "پرداختنی", Modifier.weight(1f))\n            FinanceCard("ارزش انبار", toman(inventoryValue), "بهای تمام‌شده", Modifier.weight(1f))
+            FinanceCard("بدهی تأمین‌کنندگان", "۰ تومان", "پرداختنی", Modifier.weight(1f))
+            FinanceCard("ارزش انبار", toman(inventoryValue), "بهای تمام‌شده", Modifier.weight(1f))
         }
 
         Text("دسترسی سریع", fontWeight = FontWeight.Bold, fontSize = 17.sp)
