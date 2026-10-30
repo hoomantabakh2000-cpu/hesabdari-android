@@ -6,7 +6,11 @@ data class Money(val rial: Long) {
 }
 
 enum class InventoryTransactionType {
-    PURCHASE, SALE, SALE_RETURN, PURCHASE_RETURN
+    OPENING_BALANCE,
+    PURCHASE,
+    SALE,
+    SALE_RETURN,
+    PURCHASE_RETURN
 }
 
 data class InventoryTransaction(
@@ -22,7 +26,10 @@ data class InventoryState(
 )
 
 object WeightedAverageInventory {
-    fun calculate(transactions: List<InventoryTransaction>, allowNegative: Boolean = false): InventoryState {
+    fun calculate(
+        transactions: List<InventoryTransaction>,
+        allowNegative: Boolean = false
+    ): InventoryState {
         var quantity = 0L
         var value = 0L
 
@@ -31,25 +38,33 @@ object WeightedAverageInventory {
             require(tx.unitCostRial >= 0) { "بهای کالا نمی‌تواند منفی باشد." }
 
             when (tx.type) {
+                InventoryTransactionType.OPENING_BALANCE,
                 InventoryTransactionType.PURCHASE -> {
-                    quantity += tx.quantity
-                    value += tx.quantity * tx.unitCostRial
+                    quantity = Math.addExact(quantity, tx.quantity)
+                    value = Math.addExact(value, Math.multiplyExact(tx.quantity, tx.unitCostRial))
                 }
+
                 InventoryTransactionType.SALE -> {
-                    require(allowNegative || tx.quantity <= quantity) { "موجودی برای این فروش کافی نیست." }
+                    require(allowNegative || tx.quantity <= quantity) {
+                        "موجودی برای این فروش کافی نیست."
+                    }
                     val cost = averageCost(quantity, value)
                     quantity -= tx.quantity
-                    value -= tx.quantity * cost
+                    value -= Math.multiplyExact(tx.quantity, cost)
                     if (quantity == 0L) value = 0L
                 }
+
                 InventoryTransactionType.SALE_RETURN -> {
-                    quantity += tx.quantity
-                    value += tx.quantity * tx.unitCostRial
+                    quantity = Math.addExact(quantity, tx.quantity)
+                    value = Math.addExact(value, Math.multiplyExact(tx.quantity, tx.unitCostRial))
                 }
+
                 InventoryTransactionType.PURCHASE_RETURN -> {
-                    require(allowNegative || tx.quantity <= quantity) { "موجودی برای برگشت خرید کافی نیست." }
+                    require(allowNegative || tx.quantity <= quantity) {
+                        "موجودی برای برگشت خرید کافی نیست."
+                    }
                     quantity -= tx.quantity
-                    value -= tx.quantity * tx.unitCostRial
+                    value -= Math.multiplyExact(tx.quantity, tx.unitCostRial)
                     if (quantity == 0L) value = 0L
                 }
             }
