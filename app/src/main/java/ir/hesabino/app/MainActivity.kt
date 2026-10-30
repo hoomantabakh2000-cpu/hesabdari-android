@@ -113,8 +113,8 @@ private fun DashboardScreen(onSales: () -> Unit, onPurchases: () -> Unit, onInve
                 Text("تصویر سریع کسب‌وکار شما", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(16.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    MetricPill("فروش امروز", "۲٫۸۵ میلیون", Modifier.weight(1f))
-                    MetricPill("سود امروز", "۶۸۰ هزار", Modifier.weight(1f))
+                    MetricPill("فروش امروز", "۰ تومان", Modifier.weight(1f))
+                    MetricPill("سود امروز", "۰ تومان", Modifier.weight(1f))
                 }
             }
         }
@@ -122,12 +122,12 @@ private fun DashboardScreen(onSales: () -> Unit, onPurchases: () -> Unit, onInve
         Text("وضعیت مالی", fontWeight = FontWeight.Bold, fontSize = 17.sp)
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            FinanceCard("صندوق و بانک", "۲۵٫۸ میلیون", "موجودی", Modifier.weight(1f))
-            FinanceCard("طلب مشتریان", "۱۸٫۷ میلیون", "دریافتنی", Modifier.weight(1f))
+            FinanceCard("صندوق و بانک", "۰ تومان", "موجودی", Modifier.weight(1f))
+            FinanceCard("طلب مشتریان", "۰ تومان", "دریافتنی", Modifier.weight(1f))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            FinanceCard("بدهی تأمین‌کنندگان", "۹٫۴ میلیون", "پرداختنی", Modifier.weight(1f))
-            FinanceCard("ارزش انبار", "۳۲٫۱ میلیون", "بهای تمام‌شده", Modifier.weight(1f))
+            FinanceCard("بدهی تأمین‌کنندگان", "۰ تومان", "پرداختنی", Modifier.weight(1f))
+            FinanceCard("ارزش انبار", "۰ تومان", "بهای تمام‌شده", Modifier.weight(1f))
         }
 
         Text("دسترسی سریع", fontWeight = FontWeight.Bold, fontSize = 17.sp)
@@ -140,9 +140,7 @@ private fun DashboardScreen(onSales: () -> Unit, onPurchases: () -> Unit, onInve
             Column(Modifier.padding(18.dp)) {
                 Text("هشدارها", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
-                AlertRow("۲ کالا به حداقل موجودی رسیده‌اند.", Color(0xFFD97706))
-                HorizontalDivider(Modifier.padding(vertical = 10.dp), color = Color(0xFFEAEFF4))
-                AlertRow("۱ مشتری دارای مانده سررسیدشده است.", Color(0xFFB42318))
+                Text("فعلاً هشداری ثبت نشده است.", color = Color(0xFF718096), fontSize = 13.sp)
             }
         }
     }
