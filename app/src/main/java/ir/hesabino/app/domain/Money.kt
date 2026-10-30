@@ -1,6 +1,6 @@
 package ir.hesabino.app.domain
 
-object Money {
+object MoneyFormatter {
     fun formatToman(rial: Long): String {
         return "%,d تومان".format(rial / 10)
     }
