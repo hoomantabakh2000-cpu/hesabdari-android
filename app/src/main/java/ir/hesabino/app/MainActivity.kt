@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HesabinoApp() {
     var section by rememberSaveable { mutableStateOf(AppSection.HOME) }
