@@ -260,7 +260,7 @@ class MainActivity:ComponentActivity(){
     if(scan)BarcodeScannerDialog({scan=false}){code->b=code;scan=false}
 }
 @Composable private fun NewProductForSupplierDialog(supplier:Supplier,onDismiss:()->Unit,onSave:(Product,Long,String)->Unit){
-    var n by remember{mutableStateOf("")};var b by remember{mutableStateOf("")};var buy by remember{mutableStateOf("")};var sell by remember{mutableStateOf("")};var qty by remember{mutableStateOf("1")};var inv by remember{mutableStateOf("")};var scan by remember{mutableStateOf(false)}
+    var n by remember{mutableStateOf("")};var b by remember{mutableStateOf("")};var buy by remember{mutableStateOf("")};var sell by remember{mutableStateOf("")};var qty by remember{mutableStateOf("")};var inv by remember{mutableStateOf("")};var scan by remember{mutableStateOf(false)}
     AlertDialog(onDismissRequest=onDismiss,title={Text("خرید کالای جدید از ${supplier.name}")},text={Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
         Field(n,{n=it},"نام کالا")
         Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.weight(1f)){Field(b,{b=it},"بارکد")};IconButton(onClick={scan=true}){Icon(Icons.Default.Search,null)}}
@@ -310,10 +310,26 @@ class MainActivity:ComponentActivity(){
 }
 
 @Composable private fun MoneyField(v:String,c:(String)->Unit,l:String){
-    OutlinedTextField(grouped(v),{c(digitsOnly(it))},label={Text(l)},singleLine=true,modifier=Modifier.fillMaxWidth(),suffix={Text("تومان")})
+    val display=if(v.isBlank()) "" else grouped(v)
+    OutlinedTextField(
+        value=display,
+        onValueChange={raw->
+            val d=digitsOnly(raw)
+            c(if(d.isBlank()) "" else d.trimStart('0').ifBlank{"0"})
+        },
+        label={Text(l)},singleLine=true,modifier=Modifier.fillMaxWidth(),suffix={Text("تومان")}
+    )
 }
 @Composable private fun NumberField(v:String,c:(String)->Unit,l:String){
-    OutlinedTextField(grouped(v),{c(digitsOnly(it))},label={Text(l)},singleLine=true,modifier=Modifier.fillMaxWidth())
+    val display=if(v.isBlank()) "" else grouped(v)
+    OutlinedTextField(
+        value=display,
+        onValueChange={raw->
+            val d=digitsOnly(raw)
+            c(if(d.isBlank()) "" else d.trimStart('0').ifBlank{"0"})
+        },
+        label={Text(l)},singleLine=true,modifier=Modifier.fillMaxWidth()
+    )
 }
 @Composable private fun Field(v:String,c:(String)->Unit,l:String)=OutlinedTextField(v,c,label={Text(l)},singleLine=true,modifier=Modifier.fillMaxWidth())
 @Composable private fun Coming(t:String,s:String)=Column(Modifier.fillMaxSize().padding(20.dp)){Text(t,fontSize=25.sp,fontWeight=FontWeight.Bold);Spacer(Modifier.height(12.dp));Text(s,color=Color.Gray)}
