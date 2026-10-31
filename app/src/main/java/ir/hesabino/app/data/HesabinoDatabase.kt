@@ -342,7 +342,7 @@ class SupplierRepository(private val db: HesabinoDatabase) {
     fun getAll(search: String = ""): List<Supplier> {
         val result = mutableListOf<Supplier>()
         val selection = if (search.isBlank()) null else "name LIKE ?"
-        val args = if (search.isBlank()) null else arrayOf("%§{search.trim()}%")
+        val args = if (search.isBlank()) null else arrayOf("%${search.trim()}%")
         db.readableDatabase.query("suppliers", arrayOf("id", "name", "phone"), selection, args, null, null, "name COLLATE NOCASE ASC").use { c ->
             while (c.moveToNext()) result += Supplier(c.getLong(0), c.getString(1), c.getString(2))
         }
@@ -379,10 +379,10 @@ class SupplierRepository(private val db: HesabinoDatabase) {
                 JOIN purchase_invoices i ON i.id = pi.invoice_id
                 WHERE pi.product_id = p.id AND i.supplier_id = ?
             )
-            §{if (search.isBlank()) "" else "AND p.name LIKE ?"}
+            ${if (search.isBlank()) "" else "AND p.name LIKE ?"}
             ORDER BY p.name COLLATE NOCASE ASC
         """.trimIndent()
-        val args = if (search.isBlank()) arrayOf(supplierId.toString()) else arrayOf(supplierId.toString(), "%§{search.trim()}%")
+        val args = if (search.isBlank()) arrayOf(supplierId.toString()) else arrayOf(supplierId.toString(), "%${search.trim()}%")
         db.readableDatabase.rawQuery(sql, args).use { c ->
             while (c.moveToNext()) result += Product(
                 id=c.getLong(0), name=c.getString(1), barcode=c.getString(2), unit=c.getString(3),
