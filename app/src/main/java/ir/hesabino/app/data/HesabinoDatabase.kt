@@ -348,7 +348,6 @@ data class Supplier(val id: Long, val name: String, val phone: String = "")
 data class PurchaseLine(val productId: Long, val quantity: Long, val unitCostRial: Long)
 data class PurchaseInvoice(val id: Long, val supplierId: Long, val invoiceNumber: String, val totalRial: Long, val createdAt: Long)
 data class PurchaseInvoiceLineView(val productName: String, val quantity: Long, val unitCostRial: Long)
-data class PurchaseInvoiceLine(val productName: String, val quantity: Long, val unitCostRial: Long)
 
 class SupplierRepository(private val db: HesabinoDatabase) {
     fun getAll(search: String = ""): List<Supplier> {
@@ -411,13 +410,13 @@ class PurchaseRepository(private val db: HesabinoDatabase) {
         }
         return result
     }
-    fun getInvoiceLines(invoiceId: Long): List<PurchaseInvoiceLine> {
-        val result=mutableListOf<PurchaseInvoiceLine>()
+    fun getInvoiceItems(invoiceId: Long): List<PurchaseInvoiceLineView> {
+        val result=mutableListOf<PurchaseInvoiceLineView>()
         val sql="""SELECT p.name, pi.quantity, pi.unit_cost_rial
             FROM purchase_items pi JOIN products p ON p.id=pi.product_id
             WHERE pi.invoice_id=? ORDER BY pi.id ASC"""
         db.readableDatabase.rawQuery(sql,arrayOf(invoiceId.toString())).use { cur ->
-            while(cur.moveToNext()) result += PurchaseInvoiceLine(cur.getString(0),cur.getLong(1),cur.getLong(2))
+            while(cur.moveToNext()) result += PurchaseInvoiceLineView(cur.getString(0),cur.getLong(1),cur.getLong(2))
         }
         return result
     }
