@@ -72,9 +72,9 @@ class MainActivity:ComponentActivity(){
                     AppSection.entries.forEach{item->
                         NavigationBarItem(selected=section==item,onClick={section=item},
                             icon={Icon(when(item){
-                                AppSection.HOME->Icons.Default.Home;AppSection.SALES->Icons.Default.PointOfSale
-                                AppSection.PURCHASES->Icons.Default.ReceiptLong;AppSection.INVENTORY->Icons.Default.Inventory2
-                                AppSection.MORE->Icons.Default.MoreHoriz
+                                AppSection.HOME->Icons.Default.Home;AppSection.SALES->Icons.Default.ShoppingCart
+                                AppSection.PURCHASES->Icons.Default.ShoppingCart;AppSection.INVENTORY->Icons.Default.Home
+                                AppSection.MORE->Icons.Default.MoreVert
                             },null)},label={Text(item.title)})
                     }
                 }}
@@ -99,8 +99,8 @@ class MainActivity:ComponentActivity(){
             Text("ارزش واقعی انبار",color=Color.White.copy(.75f));Text(toman(value),color=Color.White,fontSize=28.sp,fontWeight=FontWeight.Bold)
             Text("تعداد کالا: "+grouped(ps.size.toString()),color=Color.White.copy(.7f))
         }}}
-        item{Action("فاکتور خرید","تأمین‌کننده + چند کالا + شماره فاکتور",Icons.Default.ReceiptLong,onPurchase)}
-        item{Action("انبار و تأمین‌کنندگان","جستجو و ورود به کالاهای هر تأمین‌کننده",Icons.Default.Inventory2,onInventory)}
+        item{Action("فاکتور خرید","تأمین‌کننده + چند کالا + شماره فاکتور",Icons.Default.ShoppingCart,onPurchase)}
+        item{Action("انبار و تأمین‌کنندگان","جستجو و ورود به کالاهای هر تأمین‌کننده",Icons.Default.Home,onInventory)}
     }
 }
 @Composable private fun Action(t:String,s:String,icon:androidx.compose.ui.graphics.vector.ImageVector,click:()->Unit)=
@@ -126,7 +126,7 @@ class MainActivity:ComponentActivity(){
     Column(Modifier.fillMaxSize().padding(16.dp)){
         Row(verticalAlignment=Alignment.CenterVertically){
             Column(Modifier.weight(1f)){Text("انبار",fontSize=25.sp,fontWeight=FontWeight.Bold);Text("انبار بر اساس تأمین‌کننده",color=Color.Gray)}
-            Button(onClick={addSupplier=true}){Icon(Icons.Default.PersonAdd,null);Text(" تأمین‌کننده")}
+            Button(onClick={addSupplier=true}){Icon(Icons.Default.Person,null);Text(" تأمین‌کننده")}
         }
         Spacer(Modifier.height(9.dp))
         OutlinedTextField(search,{search=it},Modifier.fillMaxWidth(),singleLine=true,label={Text(if(selected==null)"جستجوی تأمین‌کننده" else "جستجوی کالا")},leadingIcon={Icon(Icons.Default.Search,null)})
@@ -135,8 +135,8 @@ class MainActivity:ComponentActivity(){
             LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){
                 items(suppliers,key={it.id}){s->Card(Modifier.fillMaxWidth().clickable{selected=s;search=""},colors=CardDefaults.cardColors(containerColor=Color.White)){
                     Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically){
-                        Icon(Icons.Default.Business,null);Spacer(Modifier.width(12.dp));Column(Modifier.weight(1f)){Text(s.name,fontWeight=FontWeight.Bold);if(s.phone.isNotBlank())Text(s.phone,color=Color.Gray,fontSize=12.sp)}
-                        Icon(Icons.Default.ChevronLeft,null)
+                        Icon(Icons.Default.Person,null);Spacer(Modifier.width(12.dp));Column(Modifier.weight(1f)){Text(s.name,fontWeight=FontWeight.Bold);if(s.phone.isNotBlank())Text(s.phone,color=Color.Gray,fontSize=12.sp)}
+                        Icon(Icons.Default.ArrowBack,null)
                     }
                 }}
             }
@@ -155,7 +155,7 @@ class MainActivity:ComponentActivity(){
                     Row(Modifier.padding(13.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){
                         Text(if(x.invoiceNumber.isBlank())"بدون شماره" else "فاکتور ${x.invoiceNumber}",fontWeight=FontWeight.Bold)
                         Text("مبلغ: ${toman(x.totalRial)}",fontSize=12.sp,color=Color.Gray)
-                    };Icon(Icons.Default.ChevronLeft,null)}
+                    };Icon(Icons.Default.ArrowBack,null)}
                 }}
                 item{Text("کالاها",fontWeight=FontWeight.Bold,fontSize=17.sp)}
                 items(products,key={it.id}){p->Card(colors=CardDefaults.cardColors(containerColor=Color.White)){Column(Modifier.padding(14.dp)){
@@ -209,7 +209,7 @@ class MainActivity:ComponentActivity(){
                 if(suppliers.isEmpty())Text("هنوز تأمین‌کننده‌ای ثبت نشده.",color=Color.Gray)
             }else Row(verticalAlignment=Alignment.CenterVertically){Text("فاکتورهای ${supplier!!.name}",fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));TextButton(onClick={supplier=null}){Text("تغییر تأمین‌کننده")}}}
             if(supplier!=null){items(pur.getInvoices(supplier!!.id),key={it.id}){x->Card(Modifier.fillMaxWidth().clickable{selectedInvoice=x},colors=CardDefaults.cardColors(containerColor=Color.White)){
-                Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(if(x.invoiceNumber.isBlank())"بدون شماره" else "فاکتور ${x.invoiceNumber}",fontWeight=FontWeight.Bold);Text("مبلغ ${toman(x.totalRial)}",fontSize=12.sp,color=Color.Gray)};Icon(Icons.Default.ChevronLeft,null)}
+                Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(if(x.invoiceNumber.isBlank())"بدون شماره" else "فاکتور ${x.invoiceNumber}",fontWeight=FontWeight.Bold);Text("مبلغ ${toman(x.totalRial)}",fontSize=12.sp,color=Color.Gray)};Icon(Icons.Default.ArrowBack,null)}
             }}}
         }else{
             item{Field(inv,{inv=it},"شماره فاکتور")}
@@ -219,8 +219,8 @@ class MainActivity:ComponentActivity(){
                 TextButton(onClick={addS=true}){Text("+ تأمین‌کننده جدید")}
             }else Row(verticalAlignment=Alignment.CenterVertically){Text("تأمین‌کننده: ${supplier!!.name}",fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));TextButton(onClick={supplier=null}){Text("تغییر")}}}
             if(supplier!=null){
-                item{Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.weight(1f)){Field(ps,{ps=it},"جستجوی کالا یا بارکد")};IconButton(onClick={scan=true}){Icon(Icons.Default.QrCodeScanner,null)}}}
-                item{OutlinedButton(onClick={addProduct=true},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.AddBox,null);Text("ثبت کالای جدید و افزودن به فاکتور")}}
+                item{Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.weight(1f)){Field(ps,{ps=it},"جستجوی کالا یا بارکد")};IconButton(onClick={scan=true}){Icon(Icons.Default.Search,null)}}}
+                item{OutlinedButton(onClick={addProduct=true},modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Add,null);Text("ثبت کالای جدید و افزودن به فاکتور")}}
                 items(products.filter{ps.isBlank()||it.name.contains(ps,true)||it.barcode==digitsOnly(ps)},key={it.id}){p->Card(Modifier.fillMaxWidth().clickable{
                     val old=lines.find{it.productId==p.id}
                     lines=if(old==null)lines+PurchaseLine(p.id,1,p.purchasePriceRial)else lines.map{if(it.productId==p.id)it.copy(quantity=it.quantity+1)else it}
@@ -236,7 +236,7 @@ class MainActivity:ComponentActivity(){
                     }}
                 }
                 item{Button(onClick={try{val s=supplier?:error("تأمین‌کننده را انتخاب کن.");pur.saveInvoice(s.id,inv,lines);lines=listOf();inv="";msg="فاکتور ذخیره شد و موجودی افزایش یافت.";onChanged()}catch(e:Exception){msg=e.message?: "خطا"}},enabled=lines.isNotEmpty(),modifier=Modifier.fillMaxWidth()){
-                    Icon(Icons.Default.Save,null);Text(" ذخیره فاکتور")
+                    Icon(Icons.Default.Check,null);Text(" ذخیره فاکتور")
                 };if(msg.isNotBlank())Text(msg,color=if(msg.startsWith("فاکتور"))Color(0xFF18A879) else Color.Red)}
             }
         }
@@ -254,7 +254,7 @@ class MainActivity:ComponentActivity(){
     var scan by remember{mutableStateOf(false)}
     AlertDialog(onDismissRequest=onDismiss,title={Text("ثبت کالای جدید")},text={Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
         Field(n,{n=it},"نام کالا")
-        Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.weight(1f)){Field(b,{b=it},"بارکد")};IconButton(onClick={scan=true}){Icon(Icons.Default.QrCodeScanner,null)}}
+        Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.weight(1f)){Field(b,{b=it},"بارکد")};IconButton(onClick={scan=true}){Icon(Icons.Default.Search,null)}}
         Field(unit,{unit=it},"واحد");MoneyField(buy,{buy=it},"قیمت خرید تومان");MoneyField(sell,{sell=it},"قیمت فروش تومان");NumberField(qty,{qty=it},"تعداد");NumberField(min,{min=it},"حداقل موجودی")
     }},confirmButton={Button(onClick={onSave(Product(name=n,barcode=digitsOnly(b),unit=unit,purchasePriceRial=(digitsOnly(buy).toLongOrNull()?:0)*10,salePriceRial=(digitsOnly(sell).toLongOrNull()?:0)*10,minStock=digitsOnly(min).toLongOrNull()?:0),digitsOnly(qty).toLongOrNull()?:0)},enabled=n.isNotBlank()&&(digitsOnly(buy).toLongOrNull()?:0)>0&&(digitsOnly(qty).toLongOrNull()?:0)>0){Text("ثبت کالا")}},dismissButton={TextButton(onClick=onDismiss){Text("انصراف")}})
     if(scan)BarcodeScannerDialog({scan=false}){code->b=code;scan=false}
@@ -263,7 +263,7 @@ class MainActivity:ComponentActivity(){
     var n by remember{mutableStateOf("")};var b by remember{mutableStateOf("")};var buy by remember{mutableStateOf("")};var sell by remember{mutableStateOf("")};var qty by remember{mutableStateOf("1")};var inv by remember{mutableStateOf("")};var scan by remember{mutableStateOf(false)}
     AlertDialog(onDismissRequest=onDismiss,title={Text("خرید کالای جدید از ${supplier.name}")},text={Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
         Field(n,{n=it},"نام کالا")
-        Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.weight(1f)){Field(b,{b=it},"بارکد")};IconButton(onClick={scan=true}){Icon(Icons.Default.QrCodeScanner,null)}}
+        Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.weight(1f)){Field(b,{b=it},"بارکد")};IconButton(onClick={scan=true}){Icon(Icons.Default.Search,null)}}
         MoneyField(buy,{buy=it},"قیمت خرید تومان");MoneyField(sell,{sell=it},"قیمت فروش تومان");NumberField(qty,{qty=it},"تعداد");Field(inv,{inv=it},"شماره فاکتور")
     }},confirmButton={Button(onClick={onSave(Product(name=n,barcode=digitsOnly(b),purchasePriceRial=(digitsOnly(buy).toLongOrNull()?:0)*10,salePriceRial=(digitsOnly(sell).toLongOrNull()?:0)*10),digitsOnly(qty).toLongOrNull()?:0,inv)},enabled=n.isNotBlank()&&(digitsOnly(buy).toLongOrNull()?:0)>0&&(digitsOnly(qty).toLongOrNull()?:0)>0){Text("ثبت و ورود به انبار")}},dismissButton={TextButton(onClick=onDismiss){Text("انصراف")}})
     if(scan)BarcodeScannerDialog({scan=false}){code->b=code;scan=false}
