@@ -5,7 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-class HesabinoDatabase(context: Context) : SQLiteOpenHelper(
+class HesabinoDatabase(val context: Context) : SQLiteOpenHelper(
     context.applicationContext,
     "hesabino.db",
     null,
@@ -362,7 +362,7 @@ class SupplierRepository(private val db: HesabinoDatabase) {
     fun findOrCreate(name: String, phone: String = ""): Long {
         require(name.isNotBlank()) { "نام تأمین‌کننده الزامی است." }
         val database = db.writableDatabase
-        database.query("suppliers", arrayOf("id"), "name = ?", arrayOf(name.trim()), null,null,null,"id ASC","1").use {
+        database.query("suppliers", arrayOf("id"), "name = ?", arrayOf(name.trim()), null, null, "id ASC", "1").use {
             if (it.moveToFirst()) return it.getLong(0)
         }
         return database.insertOrThrow("suppliers", null, ContentValues().apply {
@@ -370,7 +370,7 @@ class SupplierRepository(private val db: HesabinoDatabase) {
         })
     }
     fun getProducts(supplierId: Long, search: String = ""): List<Product> {
-        val repo = ProductRepository(db); val ids = mutableListOf<Long>()
+        val repo = ProductRepository(db.context); val ids = mutableListOf<Long>()
         val sql = if (search.isBlank())
             "SELECT DISTINCT product_id FROM purchase_items pi JOIN purchase_invoices i ON i.id=pi.invoice_id WHERE i.supplier_id=?"
         else
