@@ -316,13 +316,11 @@ class MainActivity:ComponentActivity(){
     var field by remember{mutableStateOf(TextFieldValue(initial))}
     LaunchedEffect(v){
         val currentDigits=digitsOnly(field.text)
-        if(currentDigits!=digitsOnly(v)){
-            field=TextFieldValue(if(v.isBlank()) "" else grouped(v))
-        }
+        if(currentDigits!=digitsOnly(v)) field=TextFieldValue(if(v.isBlank()) "" else grouped(v))
     }
     OutlinedTextField(
         value=field,
-        onValueChange={raw->
+        onValueChange={raw:TextFieldValue->{
             val digits=digitsOnly(raw.text)
             val normalized=if(digits.isBlank()) "" else digits.trimStart('0').ifBlank{"0"}
             val digitCountBeforeCursor=digitsOnly(raw.text.take(raw.selection.start)).length
@@ -330,19 +328,19 @@ class MainActivity:ComponentActivity(){
             var cursor=0
             var seen=0
             while(cursor<formatted.length && seen<digitCountBeforeCursor){
-                if(formatted[cursor].isDigit())seen++
+                if(formatted[cursor].isDigit()) seen++
                 cursor++
             }
             field=TextFieldValue(formatted,TextRange(cursor))
             c(normalized)
-        },
-        label={Text(l)},singleLine=true,modifier=Modifier.fillMaxWidth(),
-        suffix=if(suffix==null)null else {Text(suffix)}
+        }},
+        label={Text(l)},
+        singleLine=true,
+        modifier=Modifier.fillMaxWidth(),
+        suffix=suffix?.let{unit->{Text(unit)}}
     )
 }
-@Composable private fun MoneyField(v:String,c:(String)->Unit,l:String)=
-    FormattedNumberField(v,c,l,"تومان")
-@Composable private fun NumberField(v:String,c:(String)->Unit,l:String)=
-    FormattedNumberField(v,c,l)
+@Composable private fun MoneyField(v:String,c:(String)->Unit,l:String)=FormattedNumberField(v,c,l,"تومان")
+@Composable private fun NumberField(v:String,c:(String)->Unit,l:String)=FormattedNumberField(v,c,l)
 @Composable private fun Field(v:String,c:(String)->Unit,l:String)=OutlinedTextField(v,c,label={Text(l)},singleLine=true,modifier=Modifier.fillMaxWidth())
 @Composable private fun Coming(t:String,s:String)=Column(Modifier.fillMaxSize().padding(20.dp)){Text(t,fontSize=25.sp,fontWeight=FontWeight.Bold);Spacer(Modifier.height(12.dp));Text(s,color=Color.Gray)}
