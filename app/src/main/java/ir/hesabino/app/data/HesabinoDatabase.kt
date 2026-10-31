@@ -9,7 +9,7 @@ class HesabinoDatabase(context: Context) : SQLiteOpenHelper(
     context.applicationContext,
     "hesabino.db",
     null,
-    2
+    3
 ) {
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
@@ -20,6 +20,7 @@ class HesabinoDatabase(context: Context) : SQLiteOpenHelper(
         createProductsTable(db)
         createInventoryTransactionsTable(db)
         createIndexes(db)
+        createSuppliersAndPurchases(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -41,6 +42,7 @@ class HesabinoDatabase(context: Context) : SQLiteOpenHelper(
             )
             db.execSQL("UPDATE products SET stock = 0 WHERE stock > 0")
         }
+        if (oldVersion < 3) createSuppliersAndPurchases(db)
     }
 
     private fun createProductsTable(db: SQLiteDatabase) {
@@ -77,6 +79,42 @@ class HesabinoDatabase(context: Context) : SQLiteOpenHelper(
             )
             """.trimIndent()
         )
+    }
+
+    private fun createSuppliersAndPurchases(db: SQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS suppliers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                phone TEXT NOT NULL DEFAULT '',
+                created_at INTEGER NOT NULL
+            )
+        """.trimIndent())
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS purchase_invoices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                supplier_id INTEGER NOT NULL,
+                invoice_number TEXT NOT NULL DEFAULT '',
+                total_rial INTEGER NOT NULL DEFAULT 0,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY(supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT
+            )
+        """.trimIndent())
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS purchase_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                invoice_id INTEGER NOT NULL,
+                product_id INTEGER NOT NULL,
+                quantity INTEGER NOT NULL CHECK(quantity > 0),
+                unit_cost_rial INTEGER NOT NULL CHECK(unit_cost_rial > 0),
+                FOREIGN KEY(invoice_id) REFERENCES purchase_invoices(id) ON DELETE CASCADE,
+                FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE RESTRICT
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_suppliers_name ON suppliers(name)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_purchase_supplier ON purchase_invoices(supplier_id, created_at)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_purchase_item_invoice ON purchase_items(invoice_id)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_purchase_item_product ON purchase_items(product_id)")
     }
 
     private fun createIndexes(db: SQLiteDatabase) {
