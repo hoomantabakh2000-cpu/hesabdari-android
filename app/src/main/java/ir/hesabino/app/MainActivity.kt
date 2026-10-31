@@ -26,6 +26,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.app.ActivityCompat
+import android.app.Activity
 import ir.hesabino.app.data.*
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
@@ -119,7 +121,8 @@ class MainActivity:ComponentActivity(){
 }
 
 @Composable private fun BarcodeScannerDialog(onDismiss:()->Unit,onCode:(String)->Unit){
-    val owner=LocalLifecycleOwner.current;var done by remember{mutableStateOf(false)}
+    val context=LocalContext.current; val owner=LocalLifecycleOwner.current; var done by remember{mutableStateOf(false)}
+    LaunchedEffect(Unit){ if(ContextCompat.checkSelfPermission(context,Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED && context is Activity) ActivityCompat.requestPermissions(context,arrayOf(Manifest.permission.CAMERA),7001) }
     AlertDialog(onDismissRequest=onDismiss,title={Text("اسکن بارکد")},text={Column{
         AndroidView(factory={ctx->PreviewView(ctx).also{preview->
             val future=ProcessCameraProvider.getInstance(ctx);future.addListener({
@@ -127,7 +130,7 @@ class MainActivity:ComponentActivity(){
                 analysis.setAnalyzer(Executors.newSingleThreadExecutor()){proxy->
                     val media=proxy.image
                     if(media==null){proxy.close();return@setAnalyzer}
-                    BarcodeScanning.getClient().process(InputImage.fromMediaImage(media,proxy.imageInfo.rotationDegrees)).addOnSuccessListener{codes->if(!done)codes.firstOrNull()?.rawValue?.let{done=true;onCode(it)}}.addCompleteListener{proxy.close()}
+                    BarcodeScanning.getClient().process(InputImage.fromMediaImage(media,proxy.imageInfo.rotationDegrees)).addOnSuccessListener{codes->if(!done)codes.firstOrNull()?.rawValue?.let{done=true;onCode(it)}}.addOnCompleteListener{proxy.close()}
                 }
                 provider.unbindAll();provider.bindToLifecycle(owner,CameraSelector.DEFAULT_BACK_CAMERA,Preview.Builder().build().also{it.surfaceProvider=preview.surfaceProvider},analysis)
             },ContextCompat.getMainExecutor(ctx))
