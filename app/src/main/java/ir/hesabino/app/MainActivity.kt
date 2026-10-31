@@ -1,382 +1,139 @@
 package ir.hesabino.app
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.*
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.*
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import ir.hesabino.app.data.Product
-import ir.hesabino.app.data.ProductRepository
+import androidx.compose.ui.unit.*
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import ir.hesabino.app.data.*
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.common.InputImage
 import java.text.NumberFormat
 import java.util.Locale
+import java.util.concurrent.Executors
 
-private fun toman(rial: Long) = NumberFormat.getNumberInstance(Locale("fa")).format(rial / 10L) + " تومان"
+private fun toman(rial: Long)=NumberFormat.getNumberInstance(Locale("fa")).format(rial/10L)+" تومان"
+private enum class AppSection(val title:String){HOME("خانه"),SALES("فروش"),PURCHASES("خرید"),INVENTORY("انبار"),MORE("بیشتر")}
 
-private enum class AppSection(val title: String, val symbol: String) {
-    HOME("خانه", "⌂"),
-    SALES("فروش", "↗"),
-    PURCHASES("خرید", "↙"),
-    INVENTORY("انبار", "▦"),
-    MORE("بیشتر", "☰")
+class MainActivity:ComponentActivity(){
+    private val cameraPermission=registerForActivityResult(ActivityResultContracts.RequestPermission()){}
+    override fun onCreate(b:Bundle?){super.onCreate(b);setContent{HesabinoApp()}}
+    fun requestCamera(){if(ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED)cameraPermission.launch(Manifest.permission.CAMERA)}
 }
 
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent { HesabinoApp() }
+@Composable fun HesabinoApp(){
+    var section by rememberSaveable{mutableStateOf(AppSection.HOME)};var refresh by remember{mutableIntStateOf(0)}
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl){
+        MaterialTheme(colorScheme=lightColorScheme(primary=Color(0xFF173B5F),secondary=Color(0xFF18A879),background=Color(0xFFF5F7FA))){
+            Scaffold(topBar={TopAppBar(title={Column{Text("حسابینو",fontWeight=FontWeight.Bold);Text(section.title+" • مدیریت واقعی",fontSize=11.sp,color=Color.Gray)}})},bottomBar={NavigationBar{
+                AppSection.entries.forEach{item->NavigationBarItem(selected=section==item,onClick={section=item},icon={Icon(when(item){AppSection.HOME->Icons.Default.Home;AppSection.SALES->Icons.Default.PointOfSale;AppSection.PURCHASES->Icons.Default.ReceiptLong;AppSection.INVENTORY->Icons.Default.Inventory2;AppSection.MORE->Icons.Default.MoreHoriz},null)},label={Text(item.title)})}
+            }}){p->Box(Modifier.padding(p)){when(section){
+                AppSection.HOME->Dashboard(refresh,{section=AppSection.PURCHASES},{section=AppSection.INVENTORY})
+                AppSection.PURCHASES->PurchaseInvoiceScreen(refresh){refresh++}
+                AppSection.INVENTORY->SupplierInventoryScreen(refresh){refresh++}
+                AppSection.SALES->Coming("فروش","فاکتور فروش در فاز بعدی.")
+                AppSection.MORE->Coming("مدیریت","گزارش‌ها، دریافت و پرداخت، بکاپ و تنظیمات در فازهای بعدی.")
+            }}}
+        }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HesabinoApp() {
-    var section by rememberSaveable { mutableStateOf(AppSection.HOME) }
-    var refresh by remember { mutableIntStateOf(0) }
+@Composable private fun Dashboard(refresh:Int,onPurchase:()->Unit,onInventory:()->Unit){
+    val ctx=LocalContext.current;val repo=remember{ProductRepository(ctx)};val ps=remember(refresh){repo.getAll()};val value=remember(refresh){repo.getInventoryValueRial()}
+    LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+        item{Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF173B5F))){Column(Modifier.padding(20.dp)){Text("ارزش واقعی انبار",color=Color.White.copy(.75f));Text(toman(value),color=Color.White,fontSize=28.sp,fontWeight=FontWeight.Bold);Text("تعداد کالا: "+ps.size,color=Color.White.copy(.7f))}}}
+        item{Action("فاکتور خرید","تأمین‌کننده + چند کالا + شماره فاکتور",Icons.Default.ReceiptLong,onPurchase)}
+        item{Action("انبار و تأمین‌کنندگان","جستجو و ورود به کالاهای هر تأمین‌کننده",Icons.Default.Inventory2,onInventory)}
+    }
+}
+@Composable private fun Action(t:String,s:String,icon:androidx.compose.ui.graphics.vector.ImageVector,click:()->Unit)=Card(Modifier.fillMaxWidth().clickable(onClick=click),colors=CardDefaults.cardColors(containerColor=Color.White)){Row(Modifier.padding(17.dp),verticalAlignment=Alignment.CenterVertically){Icon(icon,null,tint=Color(0xFF18A879));Spacer(Modifier.width(13.dp));Column{Text(t,fontWeight=FontWeight.Bold);Text(s,color=Color.Gray,fontSize=12.sp)}}}
 
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-        MaterialTheme(
-            colorScheme = lightColorScheme(
-                primary = Color(0xFF173B5F),
-                secondary = Color(0xFF18A879),
-                surface = Color(0xFFF7F9FC),
-                background = Color(0xFFF7F9FC)
-            )
-        ) {
-            Scaffold(
-                containerColor = Color(0xFFF7F9FC),
-                topBar = {
-                    TopAppBar(
-                        title = {
-                            Column {
-                                Text("حسابینو", fontWeight = FontWeight.Bold)
-                                Text(section.title + " • نسخه ۰.۴", fontSize = 12.sp, color = Color(0xFF718096))
-                            }
-                        }
-                    )
-                },
-                bottomBar = {
-                    NavigationBar(
-                        modifier = Modifier.navigationBarsPadding(),
-                        containerColor = Color.White
-                    ) {
-                        AppSection.entries.forEach { item ->
-                            NavigationBarItem(
-                                selected = section == item,
-                                onClick = { section = item },
-                                icon = { Text(item.symbol, fontSize = 21.sp) },
-                                label = { Text(item.title, fontSize = 11.sp) },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = Color(0xFF173B5F),
-                                    selectedTextColor = Color(0xFF173B5F),
-                                    indicatorColor = Color(0xFFE7F0F8)
-                                )
-                            )
-                        }
-                    }
+@Composable private fun SupplierInventoryScreen(refresh:Int,onChanged:()->Unit){
+    val ctx=LocalContext.current;val db=remember{HesabinoDatabase(ctx)};val sr=remember{SupplierRepository(db)}
+    var search by remember{mutableStateOf("")};var selected by remember{mutableStateOf<Supplier?>(null)};var addSupplier by remember{mutableStateOf(false)};var edit by remember{mutableStateOf<Product?>(null)};var scan by remember{mutableStateOf(false)}
+    Column(Modifier.fillMaxSize().padding(16.dp)){
+        Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("انبار",fontSize=25.sp,fontWeight=FontWeight.Bold);Text("انبار بر اساس تأمین‌کننده",color=Color.Gray)};Button(onClick={addSupplier=true}){Icon(Icons.Default.PersonAdd,null);Text(" تأمین‌کننده")}}
+        Spacer(Modifier.height(9.dp));OutlinedTextField(search,{search=it},Modifier.fillMaxWidth(),singleLine=true,label={Text(if(selected==null)"جستجوی تأمین‌کننده" else "جستجوی کالا")},leadingIcon={Icon(Icons.Default.Search,null)})
+        if(selected==null){Spacer(Modifier.height(8.dp));LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){items(sr.getAll(search)){s->Card(Modifier.fillMaxWidth().clickable{selected=s;search=""},colors=CardDefaults.cardColors(containerColor=Color.White)){Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.Business,null);Spacer(Modifier.width(12.dp));Column(Modifier.weight(1f)){Text(s.name,fontWeight=FontWeight.Bold);if(s.phone.isNotBlank())Text(s.phone,color=Color.Gray,fontSize=12.sp)};Icon(Icons.Default.ChevronLeft,null)}}}}}
+        else{
+            Row(verticalAlignment=Alignment.CenterVertically){IconButton(onClick={selected=null;search=""}){Icon(Icons.Default.ArrowForward,null)};Text(selected!!.name,fontSize=21.sp,fontWeight=FontWeight.Bold)}
+            val products=sr.getProducts(selected!!.id,search)
+            Spacer(Modifier.height(6.dp));LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp)){items(products,key={it.id}){p->Card(colors=CardDefaults.cardColors(containerColor=Color.White)){Column(Modifier.padding(14.dp)){
+                Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(p.name,fontWeight=FontWeight.Bold);Text("موجودی: ${p.stock} ${p.unit}",color=Color.Gray,fontSize=12.sp)};IconButton(onClick={edit=p}){Icon(Icons.Default.Edit,null)}}
+                Row(horizontalArrangement=Arrangement.spacedBy(14.dp)){Text("خرید: ${toman(p.purchasePriceRial)}",fontSize=12.sp);Text("فروش: ${toman(p.salePriceRial)}",fontSize=12.sp,fontWeight=FontWeight.Bold)}
+            }}}}
+        }
+    }
+    if(addSupplier)SupplierDialog({addSupplier=false}){n,p->sr.findOrCreate(n,p);addSupplier=false;onChanged()}
+    if(edit!=null)EditProductDialog(edit!!,{edit=null},{p->ProductRepository(ctx).update(p);edit=null;onChanged()},{p->try{ProductRepository(ctx).delete(p.id);edit=null;onChanged()}catch(_:Exception){}})
+    if(scan)BarcodeScannerDialog({scan=false}){code->search=code;scan=false}
+}
+
+@Composable private fun SupplierDialog(onDismiss:()->Unit,onSave:(String,String)->Unit){
+    var n by remember{mutableStateOf("")};var p by remember{mutableStateOf("")}
+    AlertDialog(onDismissRequest=onDismiss,title={Text("تأمین‌کننده جدید")},text={Column{Field(n,{n=it},"نام تأمین‌کننده");Field(p,{p=it},"شماره تماس")}},confirmButton={Button(onClick={onSave(n,p)}){Text("ذخیره")}},dismissButton={TextButton(onClick=onDismiss){Text("انصراف")}})
+}
+@Composable private fun EditProductDialog(product:Product,onDismiss:()->Unit,onSave:(Product)->Unit,onDelete:(Product)->Unit){
+    var n by remember{mutableStateOf(product.name)};var b by remember{mutableStateOf(product.barcode)};var buy by remember{mutableStateOf((product.purchasePriceRial/10).toString())};var sell by remember{mutableStateOf((product.salePriceRial/10).toString())};var min by remember{mutableStateOf(product.minStock.toString())}
+    AlertDialog(onDismissRequest=onDismiss,title={Text("ویرایش کالا")},text={Column{Field(n,{n=it},"نام کالا");Field(b,{b=it},"بارکد");Field(buy,{buy=it.filter(Char::isDigit)},"قیمت خرید تومان");Field(sell,{sell=it.filter(Char::isDigit)},"قیمت فروش تومان");Field(min,{min=it.filter(Char::isDigit)},"حداقل موجودی")}},confirmButton={Button(onClick={onSave(product.copy(name=n,barcode=b,purchasePriceRial=(buy.toLongOrNull()?:0)*10,salePriceRial=(sell.toLongOrNull()?:0)*10,minStock=min.toLongOrNull()?:0))}){Text("ذخیره")}},dismissButton={TextButton(onClick={onDelete(product)}){Text("حذف کالا",color=Color.Red)}})
+}
+
+@Composable private fun PurchaseInvoiceScreen(refresh:Int,onChanged:()->Unit){
+    val ctx=LocalContext.current;val db=remember{HesabinoDatabase(ctx)};val sr=remember{SupplierRepository(db)};val pr=remember{ProductRepository(ctx)};val pur=remember{PurchaseRepository(db)}
+    val suppliers=remember(refresh){sr.getAll()};val products=remember(refresh){pr.getAll()}
+    var supplier by remember{mutableStateOf<Supplier?>(null)};var ss by remember{mutableStateOf("")};var ps by remember{mutableStateOf("")};var inv by remember{mutableStateOf("")};var lines by remember{mutableStateOf(listOf<PurchaseLine>())};var msg by remember{mutableStateOf("")};var addS by remember{mutableStateOf(false)};var scan by remember{mutableStateOf(false)}
+    LazyColumn(Modifier.fillMaxSize().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+        item{Text("فاکتور خرید",fontSize=25.sp,fontWeight=FontWeight.Bold);Text("هر خرید با تأمین‌کننده و شماره فاکتور جدا ذخیره می‌شود.",color=Color.Gray)}
+        item{Field(inv,{inv=it},"شماره فاکتور")}
+        item{if(supplier==null){Field(ss,{ss=it},"جستجوی تأمین‌کننده");suppliers.filter{it.name.contains(ss,true)}.take(5).forEach{s->TextButton(onClick={supplier=s}){Text(s.name)}};TextButton(onClick={addS=true}){Text("+ تأمین‌کننده جدید")}}else Row(verticalAlignment=Alignment.CenterVertically){Text("تأمین‌کننده: ${supplier!!.name}",fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));TextButton(onClick={supplier=null}){Text("تغییر")}}}
+        if(supplier!=null){
+            item{Row(verticalAlignment=Alignment.CenterVertically){Field(ps,{ps=it},"جستجوی کالا یا بارکد");IconButton(onClick={scan=true}){Icon(Icons.Default.QrCodeScanner,null)}}}
+            items(products.filter{ps.isBlank()||it.name.contains(ps,true)||it.barcode==ps},key={it.id}){p->Card(Modifier.fillMaxWidth().clickable{val old=lines.find{it.productId==p.id};lines=if(old==null)lines+PurchaseLine(p.id,1,p.purchasePriceRial)else lines.map{if(it.productId==p.id)it.copy(quantity=it.quantity+1)else it}},colors=CardDefaults.cardColors(containerColor=Color.White)){Row(Modifier.padding(13.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(p.name,fontWeight=FontWeight.Bold);Text("موجودی ${p.stock} • خرید قبلی ${toman(p.purchasePriceRial)}",color=Color.Gray,fontSize=11.sp)};Icon(Icons.Default.AddCircle,null,tint=Color(0xFF18A879))}}}
+            item{Text("اقلام فاکتور",fontWeight=FontWeight.Bold,fontSize=17.sp);lines.forEachIndexed{idx,line->val p=products.find{it.id==line.productId};if(p!=null)Row(verticalAlignment=Alignment.CenterVertically){Text(p.name,Modifier.weight(1f));Text("${line.quantity} × ${toman(line.unitCostRial)}");IconButton(onClick={lines=lines.filterIndexed{i,_->i!=idx}}){Icon(Icons.Default.Delete,null,color=Color.Red)}}}}
+            item{Button(onClick={try{val s=supplier?:error("تأمین‌کننده را انتخاب کن.");pur.saveInvoice(s.id,inv,lines);lines=listOf();inv="";msg="فاکتور ذخیره شد و موجودی افزایش یافت.";onChanged()}catch(e:Exception){msg=e.message?:"خطا"}},enabled=lines.isNotEmpty(),modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Save,null);Text(" ذخیره فاکتور")};if(msg.isNotBlank())Text(msg,color=if(msg.startsWith("فاکتور"))Color(0xFF18A879) else Color.Red)}
+        }
+    }
+    if(addS)SupplierDialog({addS=false}){n,p->supplier=Supplier(sr.findOrCreate(n,p),n,p);addS=false;onChanged()}
+    if(scan)BarcodeScannerDialog({scan=false}){code->ps=code;scan=false}
+}
+
+@Composable private fun BarcodeScannerDialog(onDismiss:()->Unit,onCode:(String)->Unit){
+    val owner=LocalLifecycleOwner.current;var done by remember{mutableStateOf(false)}
+    AlertDialog(onDismissRequest=onDismiss,title={Text("اسکن بارکد")},text={Column{
+        AndroidView(factory={ctx->PreviewView(ctx).also{preview->
+            val future=ProcessCameraProvider.getInstance(ctx);future.addListener({
+                val provider=future.get();val analysis=ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()
+                analysis.setAnalyzer(Executors.newSingleThreadExecutor()){proxy->
+                    val media=proxy.image
+                    if(media==null){proxy.close();return@setAnalyzer}
+                    BarcodeScanning.getClient().process(InputImage.fromMediaImage(media,proxy.imageInfo.rotationDegrees)).addOnSuccessListener{codes->if(!done)codes.firstOrNull()?.rawValue?.let{done=true;onCode(it)}}.addCompleteListener{proxy.close()}
                 }
-            ) { padding ->
-                Box(Modifier.padding(padding)) {
-                    when (section) {
-                        AppSection.HOME -> DashboardScreen(
-                            refresh = refresh,
-                            onSales = { section = AppSection.SALES },
-                            onPurchases = { section = AppSection.PURCHASES },
-                            onInventory = { section = AppSection.INVENTORY }
-                        )
-                        AppSection.SALES -> SectionScreen("فروش", "فاکتور فروش، مشتری، کالا و روش تسویه", "فروش جدید", "فاکتورهای فروش")
-                        AppSection.PURCHASES -> PurchaseScreen(refresh) { refresh++ }
-                        AppSection.INVENTORY -> InventoryScreen(refresh) { refresh++ }
-                        AppSection.MORE -> MoreScreen()
-                    }
-                }
-            }
-        }
-    }
+                provider.unbindAll();provider.bindToLifecycle(owner,CameraSelector.DEFAULT_BACK_CAMERA,Preview.Builder().build().also{it.surfaceProvider=preview.surfaceProvider},analysis)
+            },ContextCompat.getMainExecutor(ctx))
+        }},Modifier.fillMaxWidth().height(260.dp))
+        Text("دوربین را روی بارکد بگیر؛ بعد از تشخیص خودکار بسته می‌شود.",fontSize=12.sp,color=Color.Gray)
+    }},confirmButton={TextButton(onClick=onDismiss){Text("بستن")}})
 }
-
-@Composable
-private fun DashboardScreen(refresh: Int, onSales: () -> Unit, onPurchases: () -> Unit, onInventory: () -> Unit) {
-    val context = LocalContext.current
-    val repo = remember { ProductRepository(context) }
-    val products = remember(refresh) { repo.getAll() }
-    val inventoryValue = remember(refresh) { repo.getInventoryValueRial() }
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF173B5F)), shape = RoundedCornerShape(24.dp)) {
-            Column(Modifier.padding(20.dp)) {
-                Text("داشبورد مالی", color = Color.White, fontSize = 14.sp)
-                Spacer(Modifier.height(6.dp))
-                Text("تصویر سریع کسب‌وکار شما", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    MetricPill("فروش امروز", "۰ تومان", Modifier.weight(1f))
-                    MetricPill("سود امروز", "۰ تومان", Modifier.weight(1f))
-                }
-            }
-        }
-
-        Text("وضعیت مالی", fontWeight = FontWeight.Bold, fontSize = 17.sp)
-
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            FinanceCard("صندوق و بانک", "۰ تومان", "موجودی", Modifier.weight(1f))
-            FinanceCard("طلب مشتریان", "۰ تومان", "دریافتنی", Modifier.weight(1f))
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            FinanceCard("بدهی تأمین‌کنندگان", "۰ تومان", "پرداختنی", Modifier.weight(1f))
-            FinanceCard("ارزش انبار", toman(inventoryValue), "بهای تمام‌شده", Modifier.weight(1f))
-        }
-
-        Text("دسترسی سریع", fontWeight = FontWeight.Bold, fontSize = 17.sp)
-        QuickAction("فروش جدید", "ثبت فاکتور و دریافت", "↗", onSales)
-        QuickAction("خرید جدید", "ثبت خرید و افزایش موجودی", "↙", onPurchases)
-        QuickAction("انبار", "کالاها و گردش موجودی", "▦", onInventory)
-        QuickAction("طرف حساب‌ها", "مشتریان و تأمین‌کنندگان", "◎") {}
-
-        Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp)) {
-            Column(Modifier.padding(18.dp)) {
-                Text("هشدارها", fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(12.dp))
-                Text("فعلاً هشداری ثبت نشده است.", color = Color(0xFF718096), fontSize = 13.sp)
-            }
-        }
-    }
-}
-
-@Composable
-private fun MetricPill(title: String, value: String, modifier: Modifier) {
-    Surface(color = Color.White.copy(alpha = 0.12f), shape = RoundedCornerShape(14.dp), modifier = modifier) {
-        Column(Modifier.padding(12.dp)) {
-            Text(title, color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
-            Text(value, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        }
-    }
-}
-
-@Composable
-private fun FinanceCard(title: String, value: String, subtitle: String, modifier: Modifier) {
-    Card(modifier, colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(18.dp)) {
-        Column(Modifier.padding(15.dp)) {
-            Text(title, color = Color(0xFF718096), fontSize = 11.sp)
-            Spacer(Modifier.height(7.dp))
-            Text(value, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Color(0xFF172B4D))
-            Text(subtitle, color = Color(0xFF9AA5B1), fontSize = 10.sp)
-        }
-    }
-}
-
-@Composable
-private fun QuickAction(title: String, subtitle: String, symbol: String, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(18.dp)
-    ) {
-        Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(modifier = Modifier.size(46.dp), color = Color(0xFFEAF5F1), shape = RoundedCornerShape(14.dp)) {
-                Box(contentAlignment = Alignment.Center) { Text(symbol, color = Color(0xFF159A70), fontSize = 23.sp) }
-            }
-            Spacer(Modifier.width(13.dp))
-            Column(Modifier.weight(1f)) {
-                Text(title, fontWeight = FontWeight.Bold)
-                Text(subtitle, color = Color(0xFF718096), fontSize = 12.sp)
-            }
-            Text("‹", color = Color(0xFF718096), fontSize = 25.sp)
-        }
-    }
-}
-
-@Composable
-private fun AlertRow(text: String, color: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Surface(Modifier.size(9.dp), color = color, shape = RoundedCornerShape(50)) {}
-        Spacer(Modifier.width(9.dp))
-        Text(text, fontSize = 13.sp, color = Color(0xFF4A5568))
-    }
-}
-
-@Composable
-private fun SectionScreen(title: String, description: String, primary: String, secondary: String) {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Text(title, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF172B4D))
-        Text(description, color = Color(0xFF718096))
-        Button(onClick = {}, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp)) { Text(primary) }
-        OutlinedButton(onClick = {}, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp)) { Text(secondary) }
-        Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(18.dp)) {
-            Column(Modifier.padding(18.dp)) {
-                Text("ساختار این بخش آماده است", fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "در مرحله بعد فرم‌ها، دیتابیس و عملیات واقعی این قسمت به همین رابط متصل می‌شوند.",
-                    color = Color(0xFF718096),
-                    fontSize = 13.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MoreScreen() {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Text("مدیریت حسابینو", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        MoreRow("طرف حساب‌ها", "مشتریان و تأمین‌کنندگان")
-        MoreRow("دریافت و پرداخت", "صندوق، بانک و تسویه حساب")
-        MoreRow("گزارش‌ها", "فروش، خرید، سود و انبار")
-        MoreRow("هزینه‌ها", "ثبت و تحلیل هزینه‌های کسب‌وکار")
-        MoreRow("پشتیبان‌گیری", "نسخه پشتیبان و بازیابی اطلاعات")
-        MoreRow("تنظیمات", "اطلاعات فروشگاه و تنظیمات حسابداری")
-    }
-}
-
-@Composable
-private fun MoreRow(title: String, subtitle: String) {
-    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(18.dp)) {
-        Column(Modifier.padding(17.dp)) {
-            Text(title, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(4.dp))
-            Text(subtitle, color = Color(0xFF718096), fontSize = 12.sp)
-        }
-    }
-}
-
-
-@Composable
-private fun InventoryScreen(refresh: Int, onChanged: () -> Unit) {
-    val context = LocalContext.current
-    val repo = remember { ProductRepository(context) }
-    var showAdd by remember { mutableStateOf(false) }
-    val products = remember(refresh) { repo.getAll() }
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("انبار واقعی", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                Text(products.size.toString() + " کالا ثبت شده", color = Color.Gray)
-            }
-            Button(onClick = { showAdd = true }) { Icon(Icons.Default.Add, null); Text(" افزودن کالا") }
-        }
-        Spacer(Modifier.height(12.dp))
-        if (products.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("هنوز کالایی ثبت نشده است.", color = Color.Gray) }
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(products, key = { it.id }) { p ->
-                    Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
-                        Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Inventory2, null, tint = if (p.stock <= p.minStock) Color.Red else Color(0xFF18A879))
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(p.name, fontWeight = FontWeight.Bold)
-                                Text("قیمت فروش: " + toman(p.salePriceRial), fontSize = 12.sp, color = Color.Gray)
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(p.stock.toString() + " " + p.unit, fontWeight = FontWeight.Bold)
-                                if (p.stock <= p.minStock) Text("کمبود موجودی", color = Color.Red, fontSize = 11.sp)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    if (showAdd) ProductDialog({ showAdd = false }) {
-        repo.insert(it); showAdd = false; onChanged()
-    }
-}
-
-@Composable
-private fun ProductDialog(onDismiss: () -> Unit, onSave: (Product) -> Unit) {
-    var name by remember { mutableStateOf("") }; var barcode by remember { mutableStateOf("") }
-    var buy by remember { mutableStateOf("") }; var sell by remember { mutableStateOf("") }
-    var stock by remember { mutableStateOf("") }; var min by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf("") }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("افزودن کالای جدید") }, text = {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            SimpleField(name, { name = it }, "نام کالا")
-            SimpleField(barcode, { barcode = it }, "بارکد (اختیاری)")
-            SimpleField(buy, { buy = it.filter(Char::isDigit) }, "قیمت خرید (تومان)")
-            SimpleField(sell, { sell = it.filter(Char::isDigit) }, "قیمت فروش (تومان)")
-            SimpleField(stock, { stock = it.filter(Char::isDigit) }, "موجودی اولیه")
-            SimpleField(min, { min = it.filter(Char::isDigit) }, "حداقل موجودی")
-            if (error.isNotBlank()) Text(error, color = Color.Red, fontSize = 12.sp)
-        }
-    }, confirmButton = {
-        Button(onClick = {
-            try {
-                onSave(Product(name = name, barcode = barcode, purchasePriceRial = (buy.toLongOrNull() ?: 0L) * 10L, salePriceRial = (sell.toLongOrNull() ?: 0L) * 10L, stock = stock.toLongOrNull() ?: 0L, minStock = min.toLongOrNull() ?: 0L))
-            } catch (e: Exception) { error = e.message ?: "اطلاعات نامعتبر است." }
-        }) { Text("ذخیره کالا") }
-    }, dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } })
-}
-
-@Composable
-private fun SimpleField(value: String, onChange: (String) -> Unit, label: String) {
-    OutlinedTextField(value, onChange, label = { Text(label) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-}
-
-@Composable
-private fun PurchaseScreen(refresh: Int, onChanged: () -> Unit) {
-    val context = LocalContext.current
-    val repo = remember { ProductRepository(context) }
-    val products = remember(refresh) { repo.getAll() }
-    var selected by remember { mutableStateOf<Product?>(null) }
-    var quantity by remember { mutableStateOf("") }
-    var price by remember { mutableStateOf("") }
-    var message by remember { mutableStateOf("") }
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item {
-            Text("ثبت خرید واقعی", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            Text("با ثبت خرید، موجودی و ارزش انبار همان لحظه تغییر می‌کند.", color = Color.Gray)
-        }
-        if (products.isEmpty()) item { Text("اول از بخش انبار یک کالا اضافه کن.", color = Color.Red) }
-        items(products, key = { it.id }) { p ->
-            Card(Modifier.fillMaxWidth().clickable { selected = p; price = (p.purchasePriceRial / 10L).toString() },
-                colors = CardDefaults.cardColors(containerColor = if (selected?.id == p.id) Color(0xFFE8F5E9) else Color.White)) {
-                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(selected = selected?.id == p.id, onClick = { selected = p; price = (p.purchasePriceRial / 10L).toString() })
-                    Column { Text(p.name, fontWeight = FontWeight.Bold); Text("موجودی فعلی: " + p.stock + " " + p.unit, color = Color.Gray, fontSize = 12.sp) }
-                }
-            }
-        }
-        item {
-            SimpleField(quantity, { quantity = it.filter(Char::isDigit) }, "تعداد خرید")
-            Spacer(Modifier.height(8.dp))
-            SimpleField(price, { price = it.filter(Char::isDigit) }, "قیمت خرید هر واحد (تومان)")
-            Spacer(Modifier.height(10.dp))
-            Button(onClick = {
-                try {
-                    val p = selected ?: error("یک کالا انتخاب کن.")
-                    repo.addPurchase(p.id, quantity.toLongOrNull() ?: 0L, (price.toLongOrNull() ?: 0L) * 10L)
-                    quantity = ""; message = "خرید ثبت شد؛ موجودی انبار به‌روزرسانی شد."; onChanged()
-                } catch (e: Exception) { message = e.message ?: "خطا در ثبت خرید" }
-            }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.AddShoppingCart, null); Text(" ثبت خرید و افزایش موجودی") }
-            if (message.isNotBlank()) Text(message, color = if (message.startsWith("خرید ثبت")) Color(0xFF18A879) else Color.Red)
-        }
-    }
-}
+@Composable private fun Field(v:String,c:(String)->Unit,l:String)=OutlinedTextField(v,c,label={Text(l)},singleLine=true,modifier=Modifier.fillMaxWidth())
+@Composable private fun Coming(t:String,s:String)=Column(Modifier.fillMaxSize().padding(20.dp)){Text(t,fontSize=25.sp,fontWeight=FontWeight.Bold);Spacer(Modifier.height(12.dp));Text(s,color=Color.Gray)}
