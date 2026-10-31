@@ -44,6 +44,7 @@ class MainActivity:ComponentActivity(){
     fun requestCamera(){if(ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED)cameraPermission.launch(Manifest.permission.CAMERA)}
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable fun HesabinoApp(){
     var section by rememberSaveable{mutableStateOf(AppSection.HOME)};var refresh by remember{mutableIntStateOf(0)}
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl){
