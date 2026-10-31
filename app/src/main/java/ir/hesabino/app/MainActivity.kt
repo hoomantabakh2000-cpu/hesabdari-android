@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.*
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -309,27 +310,38 @@ class MainActivity:ComponentActivity(){
     },confirmButton={TextButton(onClick=onDismiss){Text("بستن")}})
 }
 
-@Composable private fun MoneyField(v:String,c:(String)->Unit,l:String){
-    val display=if(v.isBlank()) "" else grouped(v)
+@Composable private fun FormattedNumberField(v:String,c:(String)->Unit,l:String,suffix:String?=null){
+    val initial=if(v.isBlank()) "" else grouped(v)
+    var field by remember{mutableStateOf(TextFieldValue(initial))}
+    LaunchedEffect(v){
+        val currentDigits=digitsOnly(field.text)
+        if(currentDigits!=digitsOnly(v)){
+            field=TextFieldValue(if(v.isBlank()) "" else grouped(v))
+        }
+    }
     OutlinedTextField(
-        value=display,
+        value=field,
         onValueChange={raw->
-            val d=digitsOnly(raw)
-            c(if(d.isBlank()) "" else d.trimStart('0').ifBlank{"0"})
+            val digits=digitsOnly(raw.text)
+            val normalized=if(digits.isBlank()) "" else digits.trimStart('0').ifBlank{"0"}
+            val digitCountBeforeCursor=digitsOnly(raw.text.take(raw.selection.start)).length
+            val formatted=if(normalized.isBlank()) "" else grouped(normalized)
+            var cursor=0
+            var seen=0
+            while(cursor<formatted.length && seen<digitCountBeforeCursor){
+                if(formatted[cursor].isDigit())seen++
+                cursor++
+            }
+            field=TextFieldValue(formatted,TextRange(cursor))
+            c(normalized)
         },
-        label={Text(l)},singleLine=true,modifier=Modifier.fillMaxWidth(),suffix={Text("تومان")}
+        label={Text(l)},singleLine=true,modifier=Modifier.fillMaxWidth(),
+        suffix=if(suffix==null)null else {Text(suffix)}
     )
 }
-@Composable private fun NumberField(v:String,c:(String)->Unit,l:String){
-    val display=if(v.isBlank()) "" else grouped(v)
-    OutlinedTextField(
-        value=display,
-        onValueChange={raw->
-            val d=digitsOnly(raw)
-            c(if(d.isBlank()) "" else d.trimStart('0').ifBlank{"0"})
-        },
-        label={Text(l)},singleLine=true,modifier=Modifier.fillMaxWidth()
-    )
-}
+@Composable private fun MoneyField(v:String,c:(String)->Unit,l:String)=
+    FormattedNumberField(v,c,l,"تومان")
+@Composable private fun NumberField(v:String,c:(String)->Unit,l:String)=
+    FormattedNumberField(v,c,l)
 @Composable private fun Field(v:String,c:(String)->Unit,l:String)=OutlinedTextField(v,c,label={Text(l)},singleLine=true,modifier=Modifier.fillMaxWidth())
 @Composable private fun Coming(t:String,s:String)=Column(Modifier.fillMaxSize().padding(20.dp)){Text(t,fontSize=25.sp,fontWeight=FontWeight.Bold);Spacer(Modifier.height(12.dp));Text(s,color=Color.Gray)}
