@@ -143,7 +143,7 @@ class MainActivity:ComponentActivity(){
     AlertDialog(onDismissRequest=onDismiss,title={Text("خرید کالای جدید از ${supplier.name}")},text={Column(verticalArrangement=Arrangement.spacedBy(6.dp)){Field(n,{n=it},"نام کالا");Field(b,{b=it},"بارکد");Field(buy,{buy=it.filter(Char::isDigit)},"قیمت خرید تومان");Field(sell,{sell=it.filter(Char::isDigit)},"قیمت فروش تومان");Field(qty,{qty=it.filter(Char::isDigit)},"تعداد");Field(inv,{inv=it},"شماره فاکتور")}},confirmButton={Button(onClick={onSave(Product(name=n,barcode=b,purchasePriceRial=(buy.toLongOrNull()?:0)*10,salePriceRial=(sell.toLongOrNull()?:0)*10),qty.toLongOrNull()?:0,inv)},enabled=n.isNotBlank()&&buy.toLongOrNull()!=null&&buy.toLong()>0&&(qty.toLongOrNull()?:0)>0){Text("ثبت و ورود به انبار")}},dismissButton={TextButton(onClick=onDismiss){Text("انصراف")}})
 }
 @Composable private fun InvoiceDetailDialog(invoice:PurchaseInvoice,pur:PurchaseRepository,onDismiss:()->Unit){
-    val lines=remember(invoice.id){pur.getInvoiceLines(invoice.id)}
+    val lines=remember(invoice.id){pur.getInvoiceItems(invoice.id)}
     AlertDialog(onDismissRequest=onDismiss,title={Text(if(invoice.invoiceNumber.isBlank())"فاکتور خرید" else "فاکتور ${invoice.invoiceNumber}")},text={LazyColumn(verticalArrangement=Arrangement.spacedBy(7.dp)){items(lines){line->Row(Modifier.fillMaxWidth()){Text(line.productName,Modifier.weight(1f));Text("${line.quantity} × ${toman(line.unitCostRial)}")}};item{HorizontalDivider();Spacer(Modifier.height(6.dp));Text("جمع فاکتور: ${toman(invoice.totalRial)}",fontWeight=FontWeight.Bold)}}},confirmButton={Button(onClick=onDismiss){Text("بستن")}})
 }
 
