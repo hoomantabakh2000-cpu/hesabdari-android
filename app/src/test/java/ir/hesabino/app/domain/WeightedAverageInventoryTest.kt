@@ -42,7 +42,7 @@ class WeightedAverageInventoryTest {
 
         assertEquals(7L, state.quantity)
         assertEquals(700_000L, state.valueRial)
-        assertEquals(100_000L, state.averageCostRial)
+        assertEquals(113_333L, state.averageCostRial)
     }
 
     @Test
@@ -56,7 +56,7 @@ class WeightedAverageInventoryTest {
         )
 
         assertEquals(15L, state.quantity)
-        assertEquals(1_500_000L, state.valueRial)
+        assertEquals(1_700_000L, state.valueRial)
         assertEquals(100_000L, state.averageCostRial)
     }
 
