@@ -135,36 +135,25 @@ class ProductRepository(context: Context) {
 
     fun getAll(): List<Product> {
         val result = mutableListOf<Product>()
-        db.readableDatabase.query(
-            "products",
-            null,
-            null,
-            null,
-            null,
-            null,
-            "name COLLATE NOCASE ASC"
-        ).use { c ->
-            val id = c.getColumnIndexOrThrow("id")
-            val name = c.getColumnIndexOrThrow("name")
-            val barcode = c.getColumnIndexOrThrow("barcode")
-            val unit = c.getColumnIndexOrThrow("unit")
-            val purchase = c.getColumnIndexOrThrow("purchase_price_rial")
-            val sale = c.getColumnIndexOrThrow("sale_price_rial")
-            val minStock = c.getColumnIndexOrThrow("min_stock")
-            val created = c.getColumnIndexOrThrow("created_at")
-
+        val sql = """
+            SELECT p.id, p.name, p.barcode, p.unit, p.purchase_price_rial, p.sale_price_rial,
+                   p.min_stock, p.created_at,
+                   COALESCE((
+                       SELECT SUM(CASE
+                           WHEN it.type IN ('OPENING_BALANCE','PURCHASE','SALE_RETURN') THEN it.quantity
+                           WHEN it.type IN ('SALE','PURCHASE_RETURN') THEN -it.quantity
+                           ELSE 0 END)
+                       FROM inventory_transactions it WHERE it.product_id = p.id
+                   ), 0) AS current_stock
+            FROM products p
+            ORDER BY p.name COLLATE NOCASE ASC
+        """.trimIndent()
+        db.readableDatabase.rawQuery(sql, null).use { c ->
             while (c.moveToNext()) {
-                val productId = c.getLong(id)
                 result += Product(
-                    id = productId,
-                    name = c.getString(name),
-                    barcode = c.getString(barcode),
-                    unit = c.getString(unit),
-                    purchasePriceRial = c.getLong(purchase),
-                    salePriceRial = c.getLong(sale),
-                    stock = inventoryLedger.getCurrentState(productId).quantity,
-                    minStock = c.getLong(minStock),
-                    createdAt = c.getLong(created)
+                    id = c.getLong(0), name = c.getString(1), barcode = c.getString(2), unit = c.getString(3),
+                    purchasePriceRial = c.getLong(4), salePriceRial = c.getLong(5), stock = c.getLong(8),
+                    minStock = c.getLong(6), createdAt = c.getLong(7)
                 )
             }
         }
@@ -352,37 +341,92 @@ data class PurchaseInvoiceLineView(val productName: String, val quantity: Long, 
 class SupplierRepository(private val db: HesabinoDatabase) {
     fun getAll(search: String = ""): List<Supplier> {
         val result = mutableListOf<Supplier>()
-        val q = "%${search}%"
-        db.readableDatabase.query("suppliers", arrayOf("id","name","phone"),
-            if (search.isBlank()) null else "name LIKE ?",
-            if (search.isBlank()) null else arrayOf(q), null,null,"name COLLATE NOCASE ASC").use { c ->
+        val selection = if (search.isBlank()) null else "name LIKE ?"
+        val args = if (search.isBlank()) null else arrayOf("%§{search.trim()}%")
+        db.readableDatabase.query("suppliers", arrayOf("id", "name", "phone"), selection, args, null, null, "name COLLATE NOCASE ASC").use { c ->
             while (c.moveToNext()) result += Supplier(c.getLong(0), c.getString(1), c.getString(2))
         }
         return result
     }
+
     fun findOrCreate(name: String, phone: String = ""): Long {
         require(name.isNotBlank()) { "نام تأمین‌کننده الزامی است." }
+        val cleanName = name.trim()
         val database = db.writableDatabase
-        database.query("suppliers", arrayOf("id"), "name = ?", arrayOf(name.trim()), null, null, "id ASC", "1").use {
+        database.query("suppliers", arrayOf("id"), "name = ?", arrayOf(cleanName), null, null, "id ASC", "1").use {
             if (it.moveToFirst()) return it.getLong(0)
         }
         return database.insertOrThrow("suppliers", null, ContentValues().apply {
-            put("name", name.trim()); put("phone", phone.trim()); put("created_at", System.currentTimeMillis())
+            put("name", cleanName); put("phone", phone.trim()); put("created_at", System.currentTimeMillis())
         })
     }
+
     fun getProducts(supplierId: Long, search: String = ""): List<Product> {
-        val repo = ProductRepository(db.context); val ids = mutableListOf<Long>()
-        val sql = if (search.isBlank())
-            "SELECT DISTINCT product_id FROM purchase_items pi JOIN purchase_invoices i ON i.id=pi.invoice_id WHERE i.supplier_id=?"
-        else
-            "SELECT DISTINCT pi.product_id FROM purchase_items pi JOIN purchase_invoices i ON i.id=pi.invoice_id JOIN products p ON p.id=pi.product_id WHERE i.supplier_id=? AND p.name LIKE ?"
-        val args = if (search.isBlank()) arrayOf(supplierId.toString()) else arrayOf(supplierId.toString(), "%${search}%")
-        db.readableDatabase.rawQuery(sql,args).use { cur -> while(cur.moveToNext()) ids += cur.getLong(0) }
-        return repo.getAll().filter { it.id in ids }
+        val result = mutableListOf<Product>()
+        val sql = """
+            SELECT p.id, p.name, p.barcode, p.unit, p.purchase_price_rial, p.sale_price_rial,
+                   p.min_stock, p.created_at,
+                   COALESCE((
+                       SELECT SUM(CASE
+                           WHEN it.type IN ('OPENING_BALANCE','PURCHASE','SALE_RETURN') THEN it.quantity
+                           WHEN it.type IN ('SALE','PURCHASE_RETURN') THEN -it.quantity
+                           ELSE 0 END)
+                       FROM inventory_transactions it WHERE it.product_id = p.id
+                   ), 0) AS current_stock
+            FROM products p
+            WHERE EXISTS (
+                SELECT 1 FROM purchase_items pi
+                JOIN purchase_invoices i ON i.id = pi.invoice_id
+                WHERE pi.product_id = p.id AND i.supplier_id = ?
+            )
+            §{if (search.isBlank()) "" else "AND p.name LIKE ?"}
+            ORDER BY p.name COLLATE NOCASE ASC
+        """.trimIndent()
+        val args = if (search.isBlank()) arrayOf(supplierId.toString()) else arrayOf(supplierId.toString(), "%§{search.trim()}%")
+        db.readableDatabase.rawQuery(sql, args).use { c ->
+            while (c.moveToNext()) result += Product(
+                id=c.getLong(0), name=c.getString(1), barcode=c.getString(2), unit=c.getString(3),
+                purchasePriceRial=c.getLong(4), salePriceRial=c.getLong(5), stock=c.getLong(8),
+                minStock=c.getLong(6), createdAt=c.getLong(7)
+            )
+        }
+        return result
     }
 }
-
 class PurchaseRepository(private val db: HesabinoDatabase) {
+    fun insertProduct(product: Product): Long {
+        require(product.name.isNotBlank()) { "نام کالا الزامی است." }
+        require(product.purchasePriceRial > 0) { "قیمت خرید باید بیشتر از صفر باشد." }
+        return db.writableDatabase.insertOrThrow("products", null, ContentValues().apply {
+            put("name", product.name.trim()); put("barcode", product.barcode.trim())
+            put("unit", product.unit.trim().ifBlank { "عدد" })
+            put("purchase_price_rial", product.purchasePriceRial); put("sale_price_rial", product.salePriceRial)
+            put("stock", 0L); put("min_stock", product.minStock); put("created_at", product.createdAt)
+        })
+    }
+
+    fun saveNewProductInvoice(supplierId: Long, invoiceNumber: String, product: Product, quantity: Long): Long {
+        require(quantity > 0) { "تعداد خرید باید بیشتر از صفر باشد." }
+        require(product.purchasePriceRial > 0) { "قیمت خرید باید بیشتر از صفر باشد." }
+        val database = db.writableDatabase
+        database.beginTransaction()
+        try {
+            val productId = insertProduct(product)
+            val total = Math.multiplyExact(quantity, product.purchasePriceRial)
+            val invoiceId = database.insertOrThrow("purchase_invoices", null, ContentValues().apply {
+                put("supplier_id", supplierId); put("invoice_number", invoiceNumber.trim())
+                put("total_rial", total); put("created_at", System.currentTimeMillis())
+            })
+            database.insertOrThrow("purchase_items", null, ContentValues().apply {
+                put("invoice_id", invoiceId); put("product_id", productId)
+                put("quantity", quantity); put("unit_cost_rial", product.purchasePriceRial)
+            })
+            InventoryTransactionRepository(db).add(productId, "PURCHASE", quantity, product.purchasePriceRial, "PURCHASE_INVOICE", invoiceId)
+            database.setTransactionSuccessful()
+            return invoiceId
+        } finally { database.endTransaction() }
+    }
+
     fun saveInvoice(supplierId: Long, invoiceNumber: String, lines: List<PurchaseLine>): Long {
         require(lines.isNotEmpty()) { "حداقل یک کالا باید در فاکتور باشد." }
         val database=db.writableDatabase; database.beginTransaction()
@@ -403,6 +447,7 @@ class PurchaseRepository(private val db: HesabinoDatabase) {
             database.setTransactionSuccessful(); return invoiceId
         } finally { database.endTransaction() }
     }
+
     fun getInvoices(supplierId: Long): List<PurchaseInvoice> {
         val result=mutableListOf<PurchaseInvoice>()
         db.readableDatabase.query("purchase_invoices",null,"supplier_id=?",arrayOf(supplierId.toString()),null,null,"created_at DESC").use { cur ->
@@ -410,11 +455,10 @@ class PurchaseRepository(private val db: HesabinoDatabase) {
         }
         return result
     }
+
     fun getInvoiceItems(invoiceId: Long): List<PurchaseInvoiceLineView> {
         val result=mutableListOf<PurchaseInvoiceLineView>()
-        val sql="""SELECT p.name, pi.quantity, pi.unit_cost_rial
-            FROM purchase_items pi JOIN products p ON p.id=pi.product_id
-            WHERE pi.invoice_id=? ORDER BY pi.id ASC"""
+        val sql="""SELECT p.name, pi.quantity, pi.unit_cost_rial FROM purchase_items pi JOIN products p ON p.id=pi.product_id WHERE pi.invoice_id=? ORDER BY pi.id ASC"""
         db.readableDatabase.rawQuery(sql,arrayOf(invoiceId.toString())).use { cur ->
             while(cur.moveToNext()) result += PurchaseInvoiceLineView(cur.getString(0),cur.getLong(1),cur.getLong(2))
         }
