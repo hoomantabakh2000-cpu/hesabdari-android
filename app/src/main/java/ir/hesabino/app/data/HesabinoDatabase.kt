@@ -347,6 +347,7 @@ data class InventoryLedgerState(
 data class Supplier(val id: Long, val name: String, val phone: String = "")
 data class PurchaseLine(val productId: Long, val quantity: Long, val unitCostRial: Long)
 data class PurchaseInvoice(val id: Long, val supplierId: Long, val invoiceNumber: String, val totalRial: Long, val createdAt: Long)
+data class PurchaseInvoiceLine(val productName: String, val quantity: Long, val unitCostRial: Long)
 
 class SupplierRepository(private val db: HesabinoDatabase) {
     fun getAll(search: String = ""): List<Supplier> {
@@ -406,6 +407,17 @@ class PurchaseRepository(private val db: HesabinoDatabase) {
         val result=mutableListOf<PurchaseInvoice>()
         db.readableDatabase.query("purchase_invoices",null,"supplier_id=?",arrayOf(supplierId.toString()),null,null,"created_at DESC").use { cur ->
             while(cur.moveToNext()) result += PurchaseInvoice(cur.getLong(cur.getColumnIndexOrThrow("id")),cur.getLong(cur.getColumnIndexOrThrow("supplier_id")),cur.getString(cur.getColumnIndexOrThrow("invoice_number")),cur.getLong(cur.getColumnIndexOrThrow("total_rial")),cur.getLong(cur.getColumnIndexOrThrow("created_at")))
+        }
+        return result
+    }
+
+    fun getInvoiceLines(invoiceId: Long): List<PurchaseInvoiceLine> {
+        val result=mutableListOf<PurchaseInvoiceLine>()
+        val sql="""SELECT p.name, pi.quantity, pi.unit_cost_rial
+            FROM purchase_items pi JOIN products p ON p.id=pi.product_id
+            WHERE pi.invoice_id=? ORDER BY pi.id ASC"""
+        db.readableDatabase.rawQuery(sql,arrayOf(invoiceId.toString())).use { cur ->
+            while(cur.moveToNext()) result += PurchaseInvoiceLine(cur.getString(0),cur.getLong(1),cur.getLong(2))
         }
         return result
     }
