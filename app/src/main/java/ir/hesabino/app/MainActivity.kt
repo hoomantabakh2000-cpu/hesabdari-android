@@ -25,7 +25,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -143,11 +144,14 @@ class MainActivity:ComponentActivity(){
                 }}
             }
         }else{
-            val products=remember(selected!!.id,search,refresh){sr.getProducts(selected!!.id,search)}
-            val invoices=remember(selected!!.id,refresh){pur.getInvoices(selected!!.id)}
+            val selectedId=selected?.id
+            val products=if(selectedId!=null) remember(selectedId,search,refresh){sr.getProducts(selectedId,search)} else emptyList()
+            val invoices=if(selectedId!=null) remember(selectedId,refresh){pur.getInvoices(selectedId)} else emptyList()
+            val currentSupplier=selected
+            if(currentSupplier==null) return@Column
             Row(verticalAlignment=Alignment.CenterVertically){
                 IconButton(onClick={selected=null;search=""}){Icon(Icons.Default.ArrowForward,null)}
-                Column(Modifier.weight(1f)){Text(selected!!.name,fontSize=21.sp,fontWeight=FontWeight.Bold);Text("کالاهای این تأمین‌کننده",fontSize=11.sp,color=Color.Gray)}
+                Column(Modifier.weight(1f)){Text(currentSupplier.name,fontSize=21.sp,fontWeight=FontWeight.Bold);Text("کالاهای این تأمین‌کننده",fontSize=11.sp,color=Color.Gray)}
                 Button(onClick={addProduct=true}){Text("+ کالا")}
             }
             Spacer(Modifier.height(6.dp))
@@ -170,8 +174,8 @@ class MainActivity:ComponentActivity(){
         }
     }
     if(addSupplier)SupplierDialog({addSupplier=false}){n,p->sr.findOrCreate(n,p);addSupplier=false;onChanged()}
-    if(addProduct)NewProductForSupplierDialog(selected!!,{addProduct=false}){product,qty,invoiceNumber->
-        try{pur.saveNewProductInvoice(selected!!.id,invoiceNumber,product,qty);addProduct=false;onChanged()}catch(_:Exception){}
+    if(addProduct && selected != null)NewProductForSupplierDialog(selected,{addProduct=false}){product,qty,invoiceNumber->
+        try{pur.saveNewProductInvoice(selected.id,invoiceNumber,product,qty);addProduct=false;onChanged()}catch(_:Exception){}
     }
     if(edit!=null)EditProductDialog(edit!!,{edit=null},{p->try{ProductRepository(ctx).update(p);edit=null;onChanged()}catch(_:Exception){}},{p->try{ProductRepository(ctx).delete(p.id);edit=null;onChanged()}catch(_:Exception){}})
     if(invoice!=null)InvoiceDetailDialog(invoice!!,pur,{invoice=null})
@@ -252,7 +256,7 @@ class MainActivity:ComponentActivity(){
 }
 
 @Composable private fun NewProductDialog(onDismiss:()->Unit,onSave:(Product,Long)->Unit){
-    var n by remember{mutableStateOf("")};var b by remember{mutableStateOf("")};var unit by remember{mutableStateOf("عدد")};var buy by remember{mutableStateOf("")};var sell by remember{mutableStateOf("")};var min by remember{mutableStateOf("0")};var qty by remember{mutableStateOf("1")}
+    var n by remember{mutableStateOf("")};var b by remember{mutableStateOf("")};var unit by remember{mutableStateOf("عدد")};var buy by remember{mutableStateOf("")};var sell by remember{mutableStateOf("")};var min by remember{mutableStateOf("")};var qty by remember{mutableStateOf("")}
     var scan by remember{mutableStateOf(false)}
     AlertDialog(onDismissRequest=onDismiss,title={Text("ثبت کالای جدید")},text={Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
         Field(n,{n=it},"نام کالا")
@@ -312,31 +316,36 @@ class MainActivity:ComponentActivity(){
 }
 
 @Composable private fun FormattedNumberField(v:String,c:(String)->Unit,l:String,suffix:String?=null){
-    val initial=if(v.isBlank()) "" else grouped(v)
-    var field by remember{mutableStateOf(TextFieldValue(initial))}
-    LaunchedEffect(v){
-        val currentDigits=digitsOnly(field.text)
-        if(currentDigits!=digitsOnly(v)) field=TextFieldValue(if(v.isBlank()) "" else grouped(v))
+    var focused by remember{mutableStateOf(false)}
+    var text by remember{mutableStateOf(if(v.isBlank()) "" else grouped(v))}
+    LaunchedEffect(v,focused){
+        if(!focused){
+            val target=if(v.isBlank()) "" else grouped(v)
+            if(text!=target) text=target
+        }
     }
     OutlinedTextField(
-        value=field,
-        onValueChange={raw:TextFieldValue->{
-            val digits=digitsOnly(raw.text)
-            val normalized=if(digits.isBlank()) "" else digits.trimStart('0').ifBlank{"0"}
-            val digitCountBeforeCursor=digitsOnly(raw.text.take(raw.selection.start)).length
-            val formatted=if(normalized.isBlank()) "" else grouped(normalized)
-            var cursor=0
-            var seen=0
-            while(cursor<formatted.length && seen<digitCountBeforeCursor){
-                if(formatted[cursor].isDigit()) seen++
-                cursor++
+        value=text,
+        onValueChange={raw->
+            val digits=digitsOnly(raw)
+            val normalized=when{
+                digits.isBlank()->""
+                digits.all{it=='0'}->"0"
+                else->digits.trimStart('0')
             }
-            field=TextFieldValue(formatted,TextRange(cursor))
+            text=normalized
             c(normalized)
-        }},
+        },
         label={Text(l)},
         singleLine=true,
-        modifier=Modifier.fillMaxWidth(),
+        modifier=Modifier.fillMaxWidth().onFocusChanged{state->
+            val wasFocused=focused
+            focused=state.isFocused
+            if(wasFocused && !state.isFocused){
+                text=if(v.isBlank()) "" else grouped(v)
+            }
+        },
+        keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),
         suffix=suffix?.let{unit->{Text(unit)}}
     )
 }
