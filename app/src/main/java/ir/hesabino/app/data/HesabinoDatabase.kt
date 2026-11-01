@@ -142,8 +142,8 @@ class ProductRepository(context: Context) {
                    p.min_stock, p.created_at, p.category,
                    COALESCE((
                        SELECT SUM(CASE
-                           WHEN it.type IN ('OPENING_BALANCE','PURCHASE','SALE_RETURN') THEN it.quantity
-                           WHEN it.type IN ('SALE','PURCHASE_RETURN') THEN -it.quantity
+                           WHEN it.type IN ('OPENING_BALANCE','PURCHASE','SALE_RETURN','STOCK_ADJUSTMENT_IN') THEN it.quantity
+                           WHEN it.type IN ('SALE','PURCHASE_RETURN','STOCK_ADJUSTMENT_OUT') THEN -it.quantity
                            ELSE 0 END)
                        FROM inventory_transactions it WHERE it.product_id = p.id
                    ), 0) AS current_stock
@@ -230,6 +230,21 @@ class ProductRepository(context: Context) {
         db.writableDatabase.update("products", values, "id = ?", arrayOf(productId.toString()))
     }
 
+    fun setStock(productId: Long, newQuantity: Long) {
+        require(newQuantity >= 0L) { "موجودی نمی‌تواند منفی باشد." }
+        val state = inventoryLedger.getCurrentState(productId)
+        if (newQuantity == state.quantity) return
+        val increase = newQuantity > state.quantity
+        val delta = if (increase) newQuantity - state.quantity else state.quantity - newQuantity
+        inventoryLedger.add(
+            productId = productId,
+            type = if (increase) "STOCK_ADJUSTMENT_IN" else "STOCK_ADJUSTMENT_OUT",
+            quantity = delta,
+            unitCostRial = state.averageCostRial,
+            referenceType = "MANUAL_STOCK_ADJUSTMENT"
+        )
+    }
+
     fun getInventoryValueRial(): Long = getAll().sumOf { product ->
         inventoryLedger.getCurrentState(product.id).valueRial
     }
@@ -301,11 +316,11 @@ class InventoryTransactionRepository(private val db: HesabinoDatabase) {
                 val q = c.getLong(qty)
                 val unitCost = c.getLong(cost)
                 when (c.getString(type)) {
-                    "OPENING_BALANCE", "PURCHASE", "SALE_RETURN" -> {
+                    "OPENING_BALANCE", "PURCHASE", "SALE_RETURN", "STOCK_ADJUSTMENT_IN" -> {
                         quantity += q
                         value += q * unitCost
                     }
-                    "SALE" -> {
+                    "STOCK_ADJUSTMENT_OUT", "SALE" -> {
                         require(q <= quantity) { "موجودی برای این فروش کافی نیست." }
                         val average = if (quantity == 0L) 0L else (value + quantity / 2L) / quantity
                         quantity -= q
@@ -372,8 +387,8 @@ class SupplierRepository(private val db: HesabinoDatabase) {
                    p.min_stock, p.created_at,
                    COALESCE((
                        SELECT SUM(CASE
-                           WHEN it.type IN ('OPENING_BALANCE','PURCHASE','SALE_RETURN') THEN it.quantity
-                           WHEN it.type IN ('SALE','PURCHASE_RETURN') THEN -it.quantity
+                           WHEN it.type IN ('OPENING_BALANCE','PURCHASE','SALE_RETURN','STOCK_ADJUSTMENT_IN') THEN it.quantity
+                           WHEN it.type IN ('SALE','PURCHASE_RETURN','STOCK_ADJUSTMENT_OUT') THEN -it.quantity
                            ELSE 0 END)
                        FROM inventory_transactions it WHERE it.product_id = p.id
                    ), 0) AS current_stock
