@@ -23,11 +23,13 @@ class ProductRepositoryDatabaseTest {
     fun setUp() {
         context = RuntimeEnvironment.getApplication()
         context.deleteDatabase("hesabino.db")
+        context.getSharedPreferences("hesabino_setup", Context.MODE_PRIVATE).edit().clear().commit()
     }
 
     @After
     fun tearDown() {
         context.deleteDatabase("hesabino.db")
+        context.getSharedPreferences("hesabino_setup", Context.MODE_PRIVATE).edit().clear().commit()
     }
 
     @Test
@@ -210,6 +212,8 @@ class ProductRepositoryDatabaseTest {
         assertEquals(0, samples.sumOf { it.stock })
         assertEquals(0, repository.seedDemoProductsIfEmpty())
         samples.forEach { repository.delete(it.id) }
+        assertEquals(0, repository.getAll().size)
+        assertEquals(0, repository.seedDemoProductsIfEmpty())
         assertEquals(0, repository.getAll().size)
         repository.close()
     }
