@@ -153,7 +153,7 @@ fun InventoryFirstApp() {
                     }
                     item {
                         androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            items(inventoryCategories) { item ->
+                            items((listOf("همه کالاها") + (inventoryCategories.drop(1) + products.map { it.category }).distinct())) { item ->
                                 FilterChip(
                                     selected = category == item,
                                     onClick = { category = item },
@@ -213,6 +213,7 @@ fun InventoryFirstApp() {
             product = editing,
             onDismiss = { showForm = false; editing = null },
             onScan = { scanning = true; scanTarget = "form" },
+            scannedCode = scanResult,
             onSave = { product ->
                 runCatching {
                     if (product.id == 0L) repository.insert(product) else repository.update(product)
@@ -306,7 +307,7 @@ private fun InventoryInfoCell(label: String, value: String, modifier: Modifier =
 }
 
 @Composable
-private fun InventoryProductForm(product: Product?, onDismiss: () -> Unit, onScan: () -> Unit, onSave: (Product) -> Unit) {
+private fun InventoryProductForm(product: Product?, onDismiss: () -> Unit, onScan: () -> Unit, scannedCode: String, onSave: (Product) -> Unit) {
     var name by remember(product?.id) { mutableStateOf(product?.name ?: "") }
     var barcode by remember(product?.id) { mutableStateOf(product?.barcode ?: "") }
     var category by remember(product?.id) { mutableStateOf(product?.category ?: "سایر") }
@@ -316,6 +317,7 @@ private fun InventoryProductForm(product: Product?, onDismiss: () -> Unit, onSca
     var quantity by remember(product?.id) { mutableStateOf("") }
     var minimum by remember(product?.id) { mutableStateOf(product?.minStock?.toString() ?: "") }
     var localError by remember(product?.id) { mutableStateOf("") }
+    LaunchedEffect(scannedCode) { if (scannedCode.isNotBlank()) barcode = scannedCode }
 
     AlertDialog(
         onDismissRequest = onDismiss,
