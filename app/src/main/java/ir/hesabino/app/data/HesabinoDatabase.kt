@@ -236,17 +236,19 @@ class ProductRepository(context: Context) {
         if (newQuantity == state.quantity) return
         val increase = newQuantity > state.quantity
         val delta = if (increase) newQuantity - state.quantity else state.quantity - newQuantity
+        val fallbackCost = getAll().firstOrNull { it.id == productId }?.purchasePriceRial ?: 0L
+        val unitCost = if (state.averageCostRial > 0L) state.averageCostRial else fallbackCost
         inventoryLedger.add(
             productId = productId,
             type = if (increase) "STOCK_ADJUSTMENT_IN" else "STOCK_ADJUSTMENT_OUT",
             quantity = delta,
-            unitCostRial = state.averageCostRial,
+            unitCostRial = unitCost,
             referenceType = "MANUAL_STOCK_ADJUSTMENT"
         )
     }
 
-    fun getInventoryValueRial(): Long = getAll().sumOf { product ->
-        inventoryLedger.getCurrentState(product.id).valueRial
+    fun getInventoryValueRial(): Long = getAll().fold(0L) { total, product ->
+        Math.addExact(total, inventoryLedger.getCurrentState(product.id).valueRial)
     }
 
     fun delete(id: Long) {
@@ -317,20 +319,20 @@ class InventoryTransactionRepository(private val db: HesabinoDatabase) {
                 val unitCost = c.getLong(cost)
                 when (c.getString(type)) {
                     "OPENING_BALANCE", "PURCHASE", "SALE_RETURN", "STOCK_ADJUSTMENT_IN" -> {
-                        quantity += q
-                        value += q * unitCost
+                        quantity = Math.addExact(quantity, q)
+                        value = Math.addExact(value, Math.multiplyExact(q, unitCost))
                     }
                     "STOCK_ADJUSTMENT_OUT", "SALE" -> {
                         require(q <= quantity) { "موجودی برای این فروش کافی نیست." }
-                        val average = if (quantity == 0L) 0L else (value + quantity / 2L) / quantity
-                        quantity -= q
-                        value -= q * average
+                        val average = if (quantity == 0L) 0L else Math.addExact(value, quantity / 2L) / quantity
+                        quantity = Math.subtractExact(quantity, q)
+                        value = Math.subtractExact(value, Math.multiplyExact(q, average))
                         if (quantity == 0L) value = 0L
                     }
                     "PURCHASE_RETURN" -> {
                         require(q <= quantity) { "موجودی برای برگشت خرید کافی نیست." }
-                        quantity -= q
-                        value -= q * unitCost
+                        quantity = Math.subtractExact(quantity, q)
+                        value = Math.subtractExact(value, Math.multiplyExact(q, unitCost))
                         if (quantity == 0L) value = 0L
                     }
                     else -> error("نوع تراکنش انبار ناشناخته است.")
@@ -341,7 +343,7 @@ class InventoryTransactionRepository(private val db: HesabinoDatabase) {
         return InventoryLedgerState(
             quantity = quantity,
             valueRial = value,
-            averageCostRial = if (quantity == 0L) 0L else (value + quantity / 2L) / quantity
+            averageCostRial = if (quantity == 0L) 0L else Math.addExact(value, quantity / 2L) / quantity
         )
     }
 }
