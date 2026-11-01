@@ -9,7 +9,7 @@ class HesabinoDatabase(val context: Context) : SQLiteOpenHelper(
     context.applicationContext,
     "hesabino.db",
     null,
-    3
+    4
 ) {
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
@@ -58,7 +58,8 @@ class HesabinoDatabase(val context: Context) : SQLiteOpenHelper(
                 sale_price_rial INTEGER NOT NULL DEFAULT 0,
                 stock INTEGER NOT NULL DEFAULT 0,
                 min_stock INTEGER NOT NULL DEFAULT 0,
-                created_at INTEGER NOT NULL
+                created_at INTEGER NOT NULL,
+                category TEXT NOT NULL DEFAULT 'سایر'
             )
             """.trimIndent()
         )
@@ -153,7 +154,7 @@ class ProductRepository(context: Context) {
             while (c.moveToNext()) {
                 result += Product(
                     id = c.getLong(0), name = c.getString(1), barcode = c.getString(2), unit = c.getString(3),
-                    purchasePriceRial = c.getLong(4), salePriceRial = c.getLong(5), stock = c.getLong(8),
+                    purchasePriceRial = c.getLong(4), salePriceRial = c.getLong(5), stock = c.getLong(9),
                     minStock = c.getLong(6), createdAt = c.getLong(7), category = c.getString(8)
                 )
             }
