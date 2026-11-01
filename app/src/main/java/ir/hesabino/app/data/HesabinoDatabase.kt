@@ -321,6 +321,7 @@ class InventoryTransactionRepository(private val db: HesabinoDatabase) {
         }
         val state = WeightedAverageInventory.calculate(transactions)
         return InventoryLedgerState(state.quantity, state.valueRial, state.averageCostRial)
+    }
 }
 
 data class InventoryLedgerState(
