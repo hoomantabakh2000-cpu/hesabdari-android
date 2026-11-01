@@ -12,7 +12,7 @@ class HesabinoDatabase(val context: Context) : SQLiteOpenHelper(
     context.applicationContext,
     "hesabino.db",
     null,
-    4
+    5
 ) {
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
@@ -47,6 +47,10 @@ class HesabinoDatabase(val context: Context) : SQLiteOpenHelper(
         }
         if (oldVersion < 3) createSuppliersAndPurchases(db)
         if (oldVersion < 4) db.execSQL("ALTER TABLE products ADD COLUMN category TEXT NOT NULL DEFAULT 'سایر'")
+        if (oldVersion < 5) {
+            db.execSQL("ALTER TABLE purchase_items ADD COLUMN product_name TEXT NOT NULL DEFAULT ''")
+            db.execSQL("UPDATE purchase_items SET product_name = COALESCE((SELECT name FROM products WHERE products.id = purchase_items.product_id), '')")
+        }
     }
 
     private fun createProductsTable(db: SQLiteDatabase) {
@@ -110,6 +114,7 @@ class HesabinoDatabase(val context: Context) : SQLiteOpenHelper(
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 invoice_id INTEGER NOT NULL,
                 product_id INTEGER NOT NULL,
+                product_name TEXT NOT NULL DEFAULT '',
                 quantity INTEGER NOT NULL CHECK(quantity > 0),
                 unit_cost_rial INTEGER NOT NULL CHECK(unit_cost_rial > 0),
                 FOREIGN KEY(invoice_id) REFERENCES purchase_invoices(id) ON DELETE CASCADE,
@@ -488,7 +493,7 @@ class PurchaseRepository(private val db: HesabinoDatabase) {
                 put("total_rial", total); put("created_at", System.currentTimeMillis())
             })
             database.insertOrThrow("purchase_items", null, ContentValues().apply {
-                put("invoice_id", invoiceId); put("product_id", productId)
+                put("invoice_id", invoiceId); put("product_id", productId); put("product_name", product.name.trim())
                 put("quantity", quantity); put("unit_cost_rial", product.purchasePriceRial)
             })
             InventoryTransactionRepository(db).add(productId, "PURCHASE", quantity, product.purchasePriceRial, "PURCHASE_INVOICE", invoiceId)
@@ -498,24 +503,45 @@ class PurchaseRepository(private val db: HesabinoDatabase) {
     }
 
     fun saveInvoice(supplierId: Long, invoiceNumber: String, lines: List<PurchaseLine>): Long {
+        require(supplierId > 0L) { "تأمین‌کننده نامعتبر است." }
         require(lines.isNotEmpty()) { "حداقل یک کالا باید در فاکتور باشد." }
-        val database=db.writableDatabase; database.beginTransaction()
+        lines.forEach { line ->
+            require(line.productId > 0L && line.quantity > 0L && line.unitCostRial > 0L) { "مقدار، کالا و قیمت خرید نامعتبر است." }
+        }
+        val database = db.writableDatabase
+        database.beginTransaction()
         try {
-            val total=lines.sumOf { Math.multiplyExact(it.quantity,it.unitCostRial) }
-            val invoiceId=database.insertOrThrow("purchase_invoices",null,ContentValues().apply {
-                put("supplier_id",supplierId); put("invoice_number",invoiceNumber.trim()); put("total_rial",total); put("created_at",System.currentTimeMillis())
+            var total = 0L
+            lines.forEach { line -> total = Math.addExact(total, Math.multiplyExact(line.quantity, line.unitCostRial)) }
+            val invoiceId = database.insertOrThrow("purchase_invoices", null, ContentValues().apply {
+                put("supplier_id", supplierId)
+                put("invoice_number", invoiceNumber.trim())
+                put("total_rial", total)
+                put("created_at", System.currentTimeMillis())
             })
-            val ledger=InventoryTransactionRepository(db)
+            val ledger = InventoryTransactionRepository(db)
             lines.forEach { line ->
-                require(line.quantity>0 && line.unitCostRial>0) { "مقدار و قیمت خرید نامعتبر است." }
-                database.insertOrThrow("purchase_items",null,ContentValues().apply {
-                    put("invoice_id",invoiceId); put("product_id",line.productId); put("quantity",line.quantity); put("unit_cost_rial",line.unitCostRial)
+                val productName = database.query("products", arrayOf("name"), "id=?", arrayOf(line.productId.toString()), null, null, null).use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else throw IllegalArgumentException("کالا پیدا نشد.")
+                }
+                database.insertOrThrow("purchase_items", null, ContentValues().apply {
+                    put("invoice_id", invoiceId)
+                    put("product_id", line.productId)
+                    put("product_name", productName)
+                    put("quantity", line.quantity)
+                    put("unit_cost_rial", line.unitCostRial)
                 })
-                ledger.add(line.productId,"PURCHASE",line.quantity,line.unitCostRial,"PURCHASE_INVOICE",invoiceId)
-                database.update("products",ContentValues().apply { put("purchase_price_rial",line.unitCostRial) },"id=?",arrayOf(line.productId.toString()))
+                ledger.add(line.productId, "PURCHASE", line.quantity, line.unitCostRial, "PURCHASE_INVOICE", invoiceId)
+                val updated = database.update("products", ContentValues().apply {
+                    put("purchase_price_rial", line.unitCostRial)
+                }, "id=?", arrayOf(line.productId.toString()))
+                require(updated == 1) { "کالا پیدا نشد." }
             }
-            database.setTransactionSuccessful(); return invoiceId
-        } finally { database.endTransaction() }
+            database.setTransactionSuccessful()
+            return invoiceId
+        } finally {
+            database.endTransaction()
+        }
     }
 
     fun getInvoices(supplierId: Long): List<PurchaseInvoice> {
@@ -528,7 +554,7 @@ class PurchaseRepository(private val db: HesabinoDatabase) {
 
     fun getInvoiceItems(invoiceId: Long): List<PurchaseInvoiceLineView> {
         val result=mutableListOf<PurchaseInvoiceLineView>()
-        val sql="""SELECT p.name, pi.quantity, pi.unit_cost_rial FROM purchase_items pi JOIN products p ON p.id=pi.product_id WHERE pi.invoice_id=? ORDER BY pi.id ASC"""
+        val sql="""SELECT COALESCE(NULLIF(pi.product_name, ''), p.name), pi.quantity, pi.unit_cost_rial FROM purchase_items pi JOIN products p ON p.id=pi.product_id WHERE pi.invoice_id=? ORDER BY pi.id ASC"""
         db.readableDatabase.rawQuery(sql,arrayOf(invoiceId.toString())).use { cur ->
             while(cur.moveToNext()) result += PurchaseInvoiceLineView(cur.getString(0),cur.getLong(1),cur.getLong(2))
         }
