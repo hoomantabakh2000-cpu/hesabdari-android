@@ -200,6 +200,20 @@ class ProductRepositoryDatabaseTest {
         repository.close()
     }
 
+    @Test
+    fun demoProductsAreSeededOnlyForEmptyInventoryAndCanBeDeleted() {
+        val repository = ProductRepository(context)
+        assertEquals(2, repository.seedDemoProductsIfEmpty())
+        val samples = repository.getAll()
+        assertEquals(2, samples.size)
+        assertEquals(true, samples.all { it.name.startsWith("نمونه - ") })
+        assertEquals(0, samples.sumOf { it.stock })
+        assertEquals(0, repository.seedDemoProductsIfEmpty())
+        samples.forEach { repository.delete(it.id) }
+        assertEquals(0, repository.getAll().size)
+        repository.close()
+    }
+
     private class LegacyVersionThreeDatabase(context: Context) :
         SQLiteOpenHelper(context, "hesabino.db", null, 3) {
         override fun onCreate(db: SQLiteDatabase) {
