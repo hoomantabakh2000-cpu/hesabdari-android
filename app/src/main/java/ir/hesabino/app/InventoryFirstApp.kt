@@ -79,7 +79,19 @@ fun InventoryFirstApp() {
     val filtered = InventoryProductFilter.filter(products, search, category, stockFilter)
     val lowCount = products.count { it.stock > 0 && it.stock <= it.minStock }
     val outCount = products.count { it.stock == 0L }
-    val inventoryValue = runCatching { repository.getInventoryValueRial() }.getOrDefault(0L)
+    // Estimated stock values use the currently saved unit purchase/sale prices.
+    // Editing either price and reloading the product list updates these totals immediately.
+    val purchaseValue = runCatching {
+        products.fold(0L) { total, product ->
+            Math.addExact(total, Math.multiplyExact(product.stock, product.purchasePriceRial))
+        }
+    }.getOrDefault(0L)
+    val salesValue = runCatching {
+        products.fold(0L) { total, product ->
+            Math.addExact(total, Math.multiplyExact(product.stock, product.salePriceRial))
+        }
+    }.getOrDefault(0L)
+    val potentialProfit = runCatching { Math.subtractExact(salesValue, purchaseValue) }.getOrDefault(0L)
 
     CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Rtl) {
         MaterialTheme(
@@ -125,9 +137,15 @@ fun InventoryFirstApp() {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item {
-                        Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                            InventorySummaryCard("تعداد کالا", inventoryNumber(products.size.toLong()), "قلم کالا", Color(0xFF1676D2), Modifier.weight(1f))
-                            InventorySummaryCard("ارزش موجودی", inventoryToman(inventoryValue), "بر اساس بهای تمام‌شده", Color(0xFF079B87), Modifier.weight(1.35f))
+                        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                                InventorySummaryCard("تعداد کالا", inventoryNumber(products.size.toLong()), "قلم کالا", Color(0xFF1676D2), Modifier.weight(1f))
+                                InventorySummaryCard("ارزش خرید", inventoryToman(purchaseValue), "موجودی × قیمت خرید", Color(0xFF079B87), Modifier.weight(1.35f))
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                                InventorySummaryCard("ارزش فروش", inventoryToman(salesValue), "موجودی × قیمت فروش", Color(0xFF1676D2), Modifier.weight(1f))
+                                InventorySummaryCard("سود احتمالی", inventoryToman(potentialProfit), "فروش منهای خرید", if (potentialProfit >= 0) Color(0xFF159B72) else Color(0xFFE05252), Modifier.weight(1.35f))
+                            }
                         }
                     }
                     item {
