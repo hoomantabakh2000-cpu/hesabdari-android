@@ -378,11 +378,15 @@ private fun InventoryProductForm(product: Product?, onDismiss: () -> Unit, onSca
             Button(onClick = {
                 val buy = inventoryDigits(purchase).toLongOrNull()
                 val sell = inventoryDigits(sale).toLongOrNull()
-                val min = inventoryDigits(minimum).toLongOrNull() ?: 0L
-                val qty = if (product == null) inventoryDigits(quantity).toLongOrNull() ?: 0L else product.stock
+                val minText = inventoryDigits(minimum)
+                val min = if (minText.isBlank()) 0L else minText.toLongOrNull()
+                val quantityText = inventoryDigits(quantity)
+                val qty = if (product == null) {
+                    if (quantityText.isBlank()) 0L else quantityText.toLongOrNull()
+                } else product.stock
                 if (name.isBlank()) localError = "نام کالا را وارد کن"
                 else if (buy == null || buy <= 0L) localError = "قیمت خرید باید بیشتر از صفر باشد"
-                else if (sell == null || sell < 0L || min < 0L || qty < 0L) localError = "مقادیر واردشده معتبر نیستند"
+                else if (sell == null || sell < 0L || min == null || min < 0L || qty == null || qty < 0L) localError = "مقادیر واردشده معتبر نیستند"
                 else {
                     val buyRial = runCatching { Math.multiplyExact(buy, 10L) }.getOrNull()
                     val sellRial = runCatching { Math.multiplyExact(sell, 10L) }.getOrNull()
