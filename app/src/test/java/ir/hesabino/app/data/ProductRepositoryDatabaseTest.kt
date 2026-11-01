@@ -146,6 +146,32 @@ class ProductRepositoryDatabaseTest {
         repository.close()
     }
     @Test
+    fun stockAdjustmentOverflowRollsBackWithoutChangingQuantity() {
+        val repository = ProductRepository(context)
+        val id = repository.insert(Product(name = "کالای گران", purchasePriceRial = 10, stock = 1))
+
+        assertThrows(ArithmeticException::class.java) {
+            repository.setStock(id, Long.MAX_VALUE)
+        }
+
+        assertEquals(1L, repository.getAll().single().stock)
+        assertEquals(10L, repository.getInventoryValueRial())
+        repository.close()
+    }
+
+    @Test
+    fun openingBalanceValueOverflowIsRejectedBeforeProductIsSaved() {
+        val repository = ProductRepository(context)
+
+        assertThrows(ArithmeticException::class.java) {
+            repository.insert(Product(name = "کالای نامعتبر", purchasePriceRial = Long.MAX_VALUE, stock = 2))
+        }
+
+        assertEquals(0, repository.getAll().size)
+        repository.close()
+    }
+
+    @Test
     fun insertRejectsNegativePricesAndMinimumStock() {
         val repository = ProductRepository(context)
         assertThrows(IllegalArgumentException::class.java) {
