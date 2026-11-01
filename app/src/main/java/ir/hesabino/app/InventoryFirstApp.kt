@@ -109,7 +109,7 @@ fun InventoryFirstApp() {
                 },
                 floatingActionButton = {
                     ExtendedFloatingActionButton(
-                        onClick = { editing = null; showForm = true },
+                        onClick = { editing = null; scanResult = ""; showForm = true },
                         containerColor = HesabinoTeal,
                         contentColor = Color.White,
                         icon = { Icon(Icons.Default.Add, null) },
@@ -224,15 +224,19 @@ fun InventoryFirstApp() {
     if (showForm) {
         InventoryProductForm(
             product = editing,
-            onDismiss = { showForm = false; editing = null },
+            onDismiss = { showForm = false; editing = null; scanResult = "" },
             onScan = { scanResult = ""; scanning = true; scanTarget = "form" },
             scannedCode = scanResult,
             onSave = { product ->
                 runCatching {
-                    if (product.id == 0L) repository.insert(product) else repository.update(product)
+                    if (product.id == 0L) repository.insert(product) else {
+                        repository.update(product)
+                        if (editing != null && product.stock != editing!!.stock) repository.setStock(product.id, product.stock)
+                    }
                     reload()
                     showForm = false
                     editing = null
+                    scanResult = ""
                 }.onFailure { error = it.message ?: "ذخیره کالا انجام نشد" }
             }
         )
@@ -338,7 +342,7 @@ private fun InventoryProductForm(product: Product?, onDismiss: () -> Unit, onSca
     var unit by remember(product?.id) { mutableStateOf(product?.unit ?: "عدد") }
     var purchase by remember(product?.id) { mutableStateOf(if (product == null) "" else (product.purchasePriceRial / 10).toString()) }
     var sale by remember(product?.id) { mutableStateOf(if (product == null) "" else (product.salePriceRial / 10).toString()) }
-    var quantity by remember(product?.id) { mutableStateOf("") }
+    var quantity by remember(product?.id) { mutableStateOf(product?.stock?.toString() ?: "") }
     var minimum by remember(product?.id) { mutableStateOf(product?.minStock?.toString() ?: "") }
     var localError by remember(product?.id) { mutableStateOf("") }
     LaunchedEffect(scannedCode) { if (scannedCode.isNotBlank()) barcode = scannedCode }
@@ -353,16 +357,19 @@ private fun InventoryProductForm(product: Product?, onDismiss: () -> Unit, onSca
                     OutlinedTextField(barcode, { barcode = inventoryDigits(it) }, label = { Text("بارکد") }, singleLine = true, modifier = Modifier.weight(1f))
                     TextButton(onClick = onScan) { Text("اسکن") }
                 }
-                OutlinedTextField(category, { category = it }, label = { Text("دسته‌بندی") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                var categoryExpanded by remember(product?.id) { mutableStateOf(false) }
+                val categoryOptions = (listOf("آرایشی", "بهداشتی", "مراقبتی", "درمانی", "لوازم جانبی", "بسته‌بندی", "سایر") + category).distinct()
+                Box {
+                    OutlinedTextField(value = category, onValueChange = {}, readOnly = true, label = { Text("دسته‌بندی کالا") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) }, modifier = Modifier.fillMaxWidth().clickable { categoryExpanded = true }, singleLine = true)
+                    DropdownMenu(expanded = categoryExpanded, onDismissRequest = { categoryExpanded = false }, modifier = Modifier.fillMaxWidth(.82f)) {
+                        categoryOptions.forEach { option -> DropdownMenuItem(text = { Text(option) }, onClick = { category = option; categoryExpanded = false }) }
+                    }
+                }
                 OutlinedTextField(unit, { unit = it }, label = { Text("واحد (عدد، بسته، عدد و...)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(purchase, { purchase = inventoryDigits(it) }, label = { Text("قیمت خرید (تومان)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(sale, { sale = inventoryDigits(it) }, label = { Text("قیمت فروش (تومان)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(minimum, { minimum = inventoryDigits(it) }, label = { Text("حداقل موجودی") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                if (product == null) {
-                    OutlinedTextField(quantity, { quantity = inventoryDigits(it) }, label = { Text("موجودی اولیه") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                } else {
-                    Text("موجودی فعلی: ${inventoryNumber(product.stock)} ${product.unit}  (برای جلوگیری از دستکاری گردش انبار، اینجا تغییر نمی‌کند)", color = Color.Gray, fontSize = 11.sp)
-                }
+                OutlinedTextField(quantity, { quantity = inventoryDigits(it) }, label = { Text(if (product == null) "موجودی اولیه" else "موجودی فعلی") }, supportingText = { Text(if (product == null) "تعداد موجود کالا در شروع ثبت" else "تغییر موجودی در گردش انبار ثبت می‌شود") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(minimum, { minimum = inventoryDigits(it) }, label = { Text("حداقل موجودی (هشدار کمبود)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
                 if (localError.isNotBlank()) Text(localError, color = Color(0xFFD32F2F), fontSize = 12.sp)
             }
         },
@@ -377,12 +384,13 @@ private fun InventoryProductForm(product: Product?, onDismiss: () -> Unit, onSca
                     if (quantityText.isBlank()) 0L else quantityText.toLongOrNull()
                 } else product.stock
                 if (name.isBlank()) localError = "نام کالا را وارد کن"
-                else if (buy == null || buy <= 0L) localError = "قیمت خرید باید بیشتر از صفر باشد"
+                else if (buy == null || buy < 0L) localError = "قیمت خرید معتبر نیست"
                 else if (sell == null || sell < 0L || min == null || min < 0L || qty == null || qty < 0L) localError = "مقادیر واردشده معتبر نیستند"
                 else {
                     val buyRial = runCatching { Math.multiplyExact(buy, 10L) }.getOrNull()
                     val sellRial = runCatching { Math.multiplyExact(sell, 10L) }.getOrNull()
                     if (buyRial == null || sellRial == null) localError = "مبلغ واردشده بیش از حد مجاز است"
+                    else if (qty > 0L && buyRial == 0L) localError = "برای موجودی اولیه، قیمت خرید را وارد کن"
                     else onSave(Product(
                         id = product?.id ?: 0L,
                         name = name.trim(),
