@@ -20,7 +20,7 @@ class InventoryProductFilterTest {
 
     @Test
     fun barcodeSearchAcceptsPersianArabicAndLatinDigits() {
-        assertEquals(listOf(1L), InventoryProductFilter.filter(products, search = "۱۲۳۴").map { it.id })
+        assertEquals(listOf(1L), InventoryProductFilter.filter(products, search = "۱۲۳۴۵").map { it.id })
         assertEquals(listOf(2L), InventoryProductFilter.filter(products, search = "٩٨٧٦").map { it.id })
         assertEquals(listOf(3L), InventoryProductFilter.filter(products, search = "0012").map { it.id })
     }
