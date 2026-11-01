@@ -1,8 +1,10 @@
 package ir.hesabino.app.domain
 
+import java.math.BigInteger
+
 data class Money(val rial: Long) {
-    operator fun plus(other: Money) = Money(rial + other.rial)
-    operator fun minus(other: Money) = Money(rial - other.rial)
+    operator fun plus(other: Money) = Money(Math.addExact(rial, other.rial))
+    operator fun minus(other: Money) = Money(Math.subtractExact(rial, other.rial))
 }
 
 enum class InventoryTransactionType {
@@ -52,9 +54,9 @@ object WeightedAverageInventory {
                     require(allowNegative || tx.quantity <= quantity) {
                         "موجودی برای این فروش کافی نیست."
                     }
-                    val cost = averageCost(quantity, value)
+                    val removedValue = proportionalValue(value, quantity, tx.quantity)
                     quantity = Math.subtractExact(quantity, tx.quantity)
-                    value = Math.subtractExact(value, Math.multiplyExact(tx.quantity, cost))
+                    value = Math.subtractExact(value, removedValue)
                     if (quantity == 0L) value = 0L
                 }
 
@@ -75,6 +77,17 @@ object WeightedAverageInventory {
         }
 
         return InventoryState(quantity, value, averageCost(quantity, value))
+    }
+
+    // Allocate the current book value proportionally, rounding once for the whole
+    // outgoing quantity instead of rounding unit average cost before multiplying.
+    private fun proportionalValue(value: Long, quantity: Long, outgoing: Long): Long {
+        if (outgoing == 0L || quantity == 0L || value == 0L) return 0L
+        require(outgoing <= quantity) { "موجودی برای این خروج کافی نیست." }
+        val numerator = BigInteger.valueOf(value).multiply(BigInteger.valueOf(outgoing))
+        val denominator = BigInteger.valueOf(quantity)
+        val rounded = numerator.add(denominator.divide(BigInteger.TWO)).divide(denominator)
+        return rounded.longValueExact()
     }
 
     private fun averageCost(quantity: Long, value: Long): Long =
