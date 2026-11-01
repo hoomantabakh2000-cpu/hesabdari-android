@@ -138,6 +138,41 @@ class ProductRepository(context: Context) {
     private val db = HesabinoDatabase(context)
     private val inventoryLedger = InventoryTransactionRepository(db)
 
+    /**
+     * Adds clearly-labelled, zero-stock demo rows only to a brand-new empty inventory.
+     * They have no ledger movements, so the user can safely edit or delete them.
+     */
+    fun seedDemoProductsIfEmpty(): Int {
+        if (getAll().isNotEmpty()) return 0
+        val now = System.currentTimeMillis()
+        val samples = listOf(
+            Product(
+                name = "نمونه - شامپو روزانه",
+                barcode = "290000000001",
+                unit = "عدد",
+                category = "بهداشتی",
+                purchasePriceRial = 850_000,
+                salePriceRial = 1_200_000,
+                stock = 0,
+                minStock = 2,
+                createdAt = now
+            ),
+            Product(
+                name = "نمونه - کرم مرطوب‌کننده",
+                barcode = "290000000002",
+                unit = "عدد",
+                category = "مراقبتی",
+                purchasePriceRial = 1_100_000,
+                salePriceRial = 1_550_000,
+                stock = 0,
+                minStock = 2,
+                createdAt = now + 1
+            )
+        )
+        samples.forEach { insert(it) }
+        return samples.size
+    }
+
     fun getAll(): List<Product> {
         val result = mutableListOf<Product>()
         val sql = """
