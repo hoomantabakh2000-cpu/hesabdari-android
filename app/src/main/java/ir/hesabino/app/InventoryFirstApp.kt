@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import ir.hesabino.app.data.Product
 import ir.hesabino.app.data.ProductRepository
+import ir.hesabino.app.domain.InventoryProductFilter
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -73,16 +74,7 @@ fun InventoryFirstApp() {
 
     fun reload() { products = repository.getAll() }
 
-    val filtered = products.filter { p ->
-        val textMatch = search.isBlank() || p.name.contains(search.trim(), true) || p.barcode.contains(inventoryDigits(search))
-        val categoryMatch = category == "همه کالاها" || p.category == category
-        val stockMatch = when (stockFilter) {
-            "کم‌موجود" -> p.stock > 0 && p.stock <= p.minStock
-            "ناموجود" -> p.stock == 0L
-            else -> true
-        }
-        textMatch && categoryMatch && stockMatch
-    }
+    val filtered = InventoryProductFilter.filter(products, search, category, stockFilter)
     val lowCount = products.count { it.stock > 0 && it.stock <= it.minStock }
     val outCount = products.count { it.stock == 0L }
     val inventoryValue = runCatching { repository.getInventoryValueRial() }.getOrDefault(0L)
