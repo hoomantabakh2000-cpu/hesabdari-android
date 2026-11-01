@@ -3,6 +3,8 @@ package ir.hesabino.app
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -351,7 +353,7 @@ private fun InventoryProductForm(product: Product?, onDismiss: () -> Unit, onSca
         onDismissRequest = onDismiss,
         title = { Text(if (product == null) "ثبت کالای جدید" else "ویرایش کالا") },
         text = {
-            Column(Modifier.fillMaxWidth().heightIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("مشخصات کالا", color = HesabinoNavy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 OutlinedTextField(name, { name = it }, label = { Text("نام کالا") }, supportingText = { Text("نامی که در فهرست انبار نمایش داده می‌شود") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -385,9 +387,9 @@ private fun InventoryProductForm(product: Product?, onDismiss: () -> Unit, onSca
                 val minText = inventoryDigits(minimum)
                 val min = if (minText.isBlank()) 0L else minText.toLongOrNull()
                 val quantityText = inventoryDigits(quantity)
-                val qty = if (product == null) {
-                    if (quantityText.isBlank()) 0L else quantityText.toLongOrNull()
-                } else product.stock
+                val qty = if (quantityText.isBlank()) {
+                    if (product == null) 0L else product.stock
+                } else quantityText.toLongOrNull()
                 if (name.isBlank()) localError = "نام کالا را وارد کن"
                 else if (buy == null || buy < 0L) localError = "قیمت خرید معتبر نیست"
                 else if (sell == null || sell < 0L || min == null || min < 0L || qty == null || qty < 0L) localError = "مقادیر واردشده معتبر نیستند"
