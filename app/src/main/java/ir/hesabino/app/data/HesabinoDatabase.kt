@@ -43,6 +43,7 @@ class HesabinoDatabase(val context: Context) : SQLiteOpenHelper(
             db.execSQL("UPDATE products SET stock = 0 WHERE stock > 0")
         }
         if (oldVersion < 3) createSuppliersAndPurchases(db)
+        if (oldVersion < 4) db.execSQL("ALTER TABLE products ADD COLUMN category TEXT NOT NULL DEFAULT 'سایر'")
     }
 
     private fun createProductsTable(db: SQLiteDatabase) {
@@ -137,7 +138,7 @@ class ProductRepository(context: Context) {
         val result = mutableListOf<Product>()
         val sql = """
             SELECT p.id, p.name, p.barcode, p.unit, p.purchase_price_rial, p.sale_price_rial,
-                   p.min_stock, p.created_at,
+                   p.min_stock, p.created_at, p.category,
                    COALESCE((
                        SELECT SUM(CASE
                            WHEN it.type IN ('OPENING_BALANCE','PURCHASE','SALE_RETURN') THEN it.quantity
@@ -153,7 +154,7 @@ class ProductRepository(context: Context) {
                 result += Product(
                     id = c.getLong(0), name = c.getString(1), barcode = c.getString(2), unit = c.getString(3),
                     purchasePriceRial = c.getLong(4), salePriceRial = c.getLong(5), stock = c.getLong(8),
-                    minStock = c.getLong(6), createdAt = c.getLong(7)
+                    minStock = c.getLong(6), createdAt = c.getLong(7), category = c.getString(8)
                 )
             }
         }
@@ -174,6 +175,8 @@ class ProductRepository(context: Context) {
                 put("name", product.name.trim())
                 put("barcode", product.barcode.trim())
                 put("unit", product.unit.trim().ifBlank { "عدد" })
+            put("category", product.category.trim().ifBlank { "سایر" })
+                put("category", product.category.trim().ifBlank { "سایر" })
                 put("purchase_price_rial", product.purchasePriceRial)
                 put("sale_price_rial", product.salePriceRial)
                 put("stock", 0L)
