@@ -361,7 +361,7 @@ private fun InventoryProductForm(product: Product?, onDismiss: () -> Unit, onSca
                 var categoryExpanded by remember(product?.id) { mutableStateOf(false) }
                 val categoryOptions = (listOf("آرایشی", "بهداشتی", "مراقبتی", "درمانی", "لوازم جانبی", "بسته‌بندی", "سایر") + category).distinct()
                 Box {
-                    OutlinedTextField(value = category, onValueChange = {}, readOnly = true, label = { Text("دسته‌بندی کالا") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) }, modifier = Modifier.fillMaxWidth().clickable { categoryExpanded = true }, singleLine = true)
+                    OutlinedTextField(value = category, onValueChange = {}, readOnly = true, label = { Text("دسته‌بندی کالا") }, trailingIcon = { Icon(Icons.Default.Home, contentDescription = null, tint = HesabinoNavy) }, modifier = Modifier.fillMaxWidth().clickable { categoryExpanded = true }, singleLine = true)
                     DropdownMenu(expanded = categoryExpanded, onDismissRequest = { categoryExpanded = false }, modifier = Modifier.fillMaxWidth(.82f)) {
                         categoryOptions.forEach { option -> DropdownMenuItem(text = { Text(option) }, onClick = { category = option; categoryExpanded = false }) }
                     }
