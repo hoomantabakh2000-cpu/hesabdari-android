@@ -351,8 +351,9 @@ private fun InventoryProductForm(product: Product?, onDismiss: () -> Unit, onSca
         onDismissRequest = onDismiss,
         title = { Text(if (product == null) "ثبت کالای جدید" else "ویرایش کالا") },
         text = {
-            Column(Modifier.fillMaxWidth().heightIn(max = 520.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("نام کالا") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            Column(Modifier.fillMaxWidth().heightIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("مشخصات کالا", color = HesabinoNavy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                OutlinedTextField(name, { name = it }, label = { Text("نام کالا") }, supportingText = { Text("نامی که در فهرست انبار نمایش داده می‌شود") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(barcode, { barcode = inventoryDigits(it) }, label = { Text("بارکد") }, singleLine = true, modifier = Modifier.weight(1f))
                     TextButton(onClick = onScan) { Text("اسکن") }
@@ -365,10 +366,14 @@ private fun InventoryProductForm(product: Product?, onDismiss: () -> Unit, onSca
                         categoryOptions.forEach { option -> DropdownMenuItem(text = { Text(option) }, onClick = { category = option; categoryExpanded = false }) }
                     }
                 }
-                OutlinedTextField(unit, { unit = it }, label = { Text("واحد (عدد، بسته، عدد و...)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(unit, { unit = it }, label = { Text("واحد شمارش (عدد، بسته، جفت و...)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Divider(color = HesabinoBackground)
+                Text("قیمت‌گذاری", color = HesabinoNavy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 OutlinedTextField(purchase, { purchase = inventoryDigits(it) }, label = { Text("قیمت خرید (تومان)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(sale, { sale = inventoryDigits(it) }, label = { Text("قیمت فروش (تومان)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(quantity, { quantity = inventoryDigits(it) }, label = { Text(if (product == null) "موجودی اولیه" else "موجودی فعلی") }, supportingText = { Text(if (product == null) "تعداد موجود کالا در شروع ثبت" else "تغییر موجودی در گردش انبار ثبت می‌شود") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                Divider(color = HesabinoBackground)
+                Text("کنترل موجودی", color = HesabinoNavy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                OutlinedTextField(quantity, { quantity = inventoryDigits(it) }, label = { Text(if (product == null) "موجودی اولیه" else "موجودی فعلی") }, supportingText = { Text(if (product == null) "تعداد موجود کالا در شروع ثبت" else "تغییر این عدد به‌صورت سند اصلاح موجودی ثبت می‌شود") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(minimum, { minimum = inventoryDigits(it) }, label = { Text("حداقل موجودی (هشدار کمبود)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
                 if (localError.isNotBlank()) Text(localError, color = Color(0xFFD32F2F), fontSize = 12.sp)
             }
