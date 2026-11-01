@@ -57,7 +57,7 @@ private enum class AppSection(val title:String){HOME("خانه"),SALES("فروش
 
 class MainActivity:ComponentActivity(){
     private val cameraPermission=registerForActivityResult(ActivityResultContracts.RequestPermission()){}
-    override fun onCreate(b:Bundle?){super.onCreate(b);setContent{HesabinoApp()}}
+    override fun onCreate(b:Bundle?){super.onCreate(b);setContent{InventoryFirstApp()}}
     fun requestCamera(){
         if(ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED)
             cameraPermission.launch(Manifest.permission.CAMERA)
@@ -283,7 +283,7 @@ class MainActivity:ComponentActivity(){
         confirmButton={Button(onClick=onDismiss){Text("بستن")}})
 }
 
-@Composable private fun BarcodeScannerDialog(onDismiss:()->Unit,onCode:(String)->Unit){
+@Composable fun BarcodeScannerDialog(onDismiss:()->Unit,onCode:(String)->Unit){
     val context=LocalContext.current;val owner=LocalLifecycleOwner.current
     var done by remember{mutableStateOf(false)}
     val hasPermission=ContextCompat.checkSelfPermission(context,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED
