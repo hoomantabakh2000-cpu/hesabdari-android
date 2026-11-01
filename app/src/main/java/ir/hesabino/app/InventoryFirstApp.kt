@@ -56,7 +56,7 @@ private fun inventoryToman(valueRial: Long): String =
 fun InventoryFirstApp() {
     val context = LocalContext.current
     val repository = remember { ProductRepository(context) }
-    var products by remember { mutableStateOf(repository.getAll()) }
+    var products by remember { mutableStateOf(run { repository.seedDemoProductsIfEmpty(); repository.getAll() }) }
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("همه کالاها") }
     var stockFilter by remember { mutableStateOf("همه") }
@@ -195,7 +195,7 @@ fun InventoryFirstApp() {
                         items(filtered, key = { it.id }) { product ->
                             InventoryProductCard(
                                 product = product,
-                                onEdit = { editing = product; showForm = true },
+                                onEdit = { editing = product; scanResult = ""; showForm = true },
                                 onAdjust = { adjusting = product },
                                 onDelete = { deleting = product }
                             )
