@@ -167,6 +167,8 @@ class ProductRepository(context: Context) {
 
     fun insert(product: Product): Long {
         require(product.name.isNotBlank()) { "نام کالا الزامی است." }
+        require(product.purchasePriceRial >= 0 && product.salePriceRial >= 0) { "قیمت نمی‌تواند منفی باشد." }
+        require(product.minStock >= 0) { "حداقل موجودی نمی‌تواند منفی باشد." }
         require(product.stock >= 0) { "موجودی اولیه نمی‌تواند منفی باشد." }
         if (product.stock > 0) {
             require(product.purchasePriceRial > 0) { "برای موجودی اولیه، بهای خرید الزامی است." }
