@@ -160,6 +160,22 @@ class ProductRepositoryDatabaseTest {
     }
 
     @Test
+    fun overflowingManualPurchaseRollsBackTransactionAndPriceUpdate() {
+        val repository = ProductRepository(context)
+        val id = repository.insert(Product(name = "کالای دارای موجودی", purchasePriceRial = 10, stock = 1))
+
+        assertThrows(ArithmeticException::class.java) {
+            repository.addPurchase(id, Long.MAX_VALUE, 10)
+        }
+
+        val product = repository.getAll().single()
+        assertEquals(1L, product.stock)
+        assertEquals(10L, product.purchasePriceRial)
+        assertEquals(10L, repository.getInventoryValueRial())
+        repository.close()
+    }
+
+    @Test
     fun openingBalanceValueOverflowIsRejectedBeforeProductIsSaved() {
         val repository = ProductRepository(context)
 
