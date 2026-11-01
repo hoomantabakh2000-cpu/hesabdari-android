@@ -143,7 +143,12 @@ class ProductRepository(context: Context) {
      * They have no ledger movements, so the user can safely edit or delete them.
      */
     fun seedDemoProductsIfEmpty(): Int {
-        if (getAll().isNotEmpty()) return 0
+        val preferences = db.context.getSharedPreferences("hesabino_setup", Context.MODE_PRIVATE)
+        if (preferences.getBoolean("demo_products_seeded", false)) return 0
+        if (getAll().isNotEmpty()) {
+            preferences.edit().putBoolean("demo_products_seeded", true).apply()
+            return 0
+        }
         val now = System.currentTimeMillis()
         val samples = listOf(
             Product(
@@ -170,6 +175,7 @@ class ProductRepository(context: Context) {
             )
         )
         samples.forEach { insert(it) }
+        preferences.edit().putBoolean("demo_products_seeded", true).apply()
         return samples.size
     }
 
