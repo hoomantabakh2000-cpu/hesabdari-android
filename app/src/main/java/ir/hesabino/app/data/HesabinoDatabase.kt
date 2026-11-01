@@ -172,6 +172,7 @@ class ProductRepository(context: Context) {
         require(product.stock >= 0) { "موجودی اولیه نمی‌تواند منفی باشد." }
         if (product.stock > 0) {
             require(product.purchasePriceRial > 0) { "برای موجودی اولیه، بهای خرید الزامی است." }
+            Math.multiplyExact(product.stock, product.purchasePriceRial)
         }
 
         val database = db.writableDatabase
@@ -231,28 +232,52 @@ class ProductRepository(context: Context) {
     fun addPurchase(productId: Long, quantity: Long, unitCostRial: Long) {
         require(quantity > 0) { "تعداد خرید باید بیشتر از صفر باشد." }
         require(unitCostRial > 0) { "قیمت خرید باید بیشتر از صفر باشد." }
-        inventoryLedger.add(productId, "PURCHASE", quantity, unitCostRial, "MANUAL_PURCHASE")
-        val values = ContentValues().apply { put("purchase_price_rial", unitCostRial) }
-        db.writableDatabase.update("products", values, "id = ?", arrayOf(productId.toString()))
+        val database = db.writableDatabase
+        database.beginTransaction()
+        try {
+            require(getAll().any { it.id == productId }) { "کالا پیدا نشد." }
+            inventoryLedger.add(productId, "PURCHASE", quantity, unitCostRial, "MANUAL_PURCHASE")
+            val values = ContentValues().apply { put("purchase_price_rial", unitCostRial) }
+            database.update("products", values, "id = ?", arrayOf(productId.toString()))
+            inventoryLedger.getCurrentState(productId)
+            database.setTransactionSuccessful()
+        } finally {
+            database.endTransaction()
+        }
     }
 
     fun setStock(productId: Long, newQuantity: Long) {
         require(productId > 0L) { "شناسه کالا نامعتبر است." }
         require(newQuantity >= 0L) { "موجودی نمی‌تواند منفی باشد." }
-        require(getAll().any { it.id == productId }) { "کالا پیدا نشد." }
-        val state = inventoryLedger.getCurrentState(productId)
-        if (newQuantity == state.quantity) return
-        val increase = newQuantity > state.quantity
-        val delta = if (increase) newQuantity - state.quantity else state.quantity - newQuantity
-        val fallbackCost = getAll().firstOrNull { it.id == productId }?.purchasePriceRial ?: 0L
-        val unitCost = if (state.averageCostRial > 0L) state.averageCostRial else fallbackCost
-        inventoryLedger.add(
-            productId = productId,
-            type = if (increase) "STOCK_ADJUSTMENT_IN" else "STOCK_ADJUSTMENT_OUT",
-            quantity = delta,
-            unitCostRial = unitCost,
-            referenceType = "MANUAL_STOCK_ADJUSTMENT"
-        )
+
+        val database = db.writableDatabase
+        database.beginTransaction()
+        try {
+            val product = getAll().firstOrNull { it.id == productId }
+                ?: throw IllegalArgumentException("کالا پیدا نشد.")
+            val state = inventoryLedger.getCurrentState(productId)
+            if (newQuantity == state.quantity) {
+                database.setTransactionSuccessful()
+                return
+            }
+
+            val increase = newQuantity > state.quantity
+            val delta = if (increase) newQuantity - state.quantity else state.quantity - newQuantity
+            val unitCost = if (state.averageCostRial > 0L) state.averageCostRial else product.purchasePriceRial
+            inventoryLedger.add(
+                productId = productId,
+                type = if (increase) "STOCK_ADJUSTMENT_IN" else "STOCK_ADJUSTMENT_OUT",
+                quantity = delta,
+                unitCostRial = unitCost,
+                referenceType = "MANUAL_STOCK_ADJUSTMENT"
+            )
+
+            val verified = inventoryLedger.getCurrentState(productId)
+            require(verified.quantity == newQuantity) { "اصلاح موجودی با موفقیت محاسبه نشد." }
+            database.setTransactionSuccessful()
+        } finally {
+            database.endTransaction()
+        }
     }
 
     fun getInventoryValueRial(): Long = getAll().fold(0L) { total, product ->
