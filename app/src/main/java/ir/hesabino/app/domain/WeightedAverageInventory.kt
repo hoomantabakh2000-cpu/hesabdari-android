@@ -10,7 +10,9 @@ enum class InventoryTransactionType {
     PURCHASE,
     SALE,
     SALE_RETURN,
-    PURCHASE_RETURN
+    PURCHASE_RETURN,
+    STOCK_ADJUSTMENT_IN,
+    STOCK_ADJUSTMENT_OUT
 }
 
 data class InventoryTransaction(
@@ -39,18 +41,20 @@ object WeightedAverageInventory {
 
             when (tx.type) {
                 InventoryTransactionType.OPENING_BALANCE,
-                InventoryTransactionType.PURCHASE -> {
+                InventoryTransactionType.PURCHASE,
+                InventoryTransactionType.STOCK_ADJUSTMENT_IN -> {
                     quantity = Math.addExact(quantity, tx.quantity)
                     value = Math.addExact(value, Math.multiplyExact(tx.quantity, tx.unitCostRial))
                 }
 
-                InventoryTransactionType.SALE -> {
+                InventoryTransactionType.SALE,
+                InventoryTransactionType.STOCK_ADJUSTMENT_OUT -> {
                     require(allowNegative || tx.quantity <= quantity) {
                         "موجودی برای این فروش کافی نیست."
                     }
                     val cost = averageCost(quantity, value)
-                    quantity -= tx.quantity
-                    value -= Math.multiplyExact(tx.quantity, cost)
+                    quantity = Math.subtractExact(quantity, tx.quantity)
+                    value = Math.subtractExact(value, Math.multiplyExact(tx.quantity, cost))
                     if (quantity == 0L) value = 0L
                 }
 
@@ -63,8 +67,8 @@ object WeightedAverageInventory {
                     require(allowNegative || tx.quantity <= quantity) {
                         "موجودی برای برگشت خرید کافی نیست."
                     }
-                    quantity -= tx.quantity
-                    value -= Math.multiplyExact(tx.quantity, tx.unitCostRial)
+                    quantity = Math.subtractExact(quantity, tx.quantity)
+                    value = Math.subtractExact(value, Math.multiplyExact(tx.quantity, tx.unitCostRial))
                     if (quantity == 0L) value = 0L
                 }
             }
@@ -74,5 +78,5 @@ object WeightedAverageInventory {
     }
 
     private fun averageCost(quantity: Long, value: Long): Long =
-        if (quantity == 0L) 0L else (value + quantity / 2L) / quantity
+        if (quantity == 0L) 0L else Math.addExact(value, quantity / 2L) / quantity
 }
