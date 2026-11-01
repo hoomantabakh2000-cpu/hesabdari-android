@@ -58,7 +58,7 @@ private enum class AppSection(val title:String){HOME("خانه"),SALES("فروش
 
 class MainActivity:ComponentActivity(){
     private val cameraPermission=registerForActivityResult(ActivityResultContracts.RequestPermission()){}
-    override fun onCreate(b:Bundle?){super.onCreate(b);setContent{InventoryFirstApp()}}
+    override fun onCreate(b:Bundle?){super.onCreate(b);setContent{HesabinoApp()}}
     fun requestCamera(){
         if(ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED)
             cameraPermission.launch(Manifest.permission.CAMERA)
