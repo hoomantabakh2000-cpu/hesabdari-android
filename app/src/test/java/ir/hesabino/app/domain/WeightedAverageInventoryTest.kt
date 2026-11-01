@@ -84,6 +84,41 @@ class WeightedAverageInventoryTest {
         )
     }
 
+
+    @Test
+    fun stockAdjustmentsKeepInventoryValueAtWeightedAverageCost() {
+        val state = WeightedAverageInventory.calculate(
+            listOf(
+                InventoryTransaction(InventoryTransactionType.PURCHASE, 10, 100_000),
+                InventoryTransaction(InventoryTransactionType.STOCK_ADJUSTMENT_IN, 2, 100_000),
+                InventoryTransaction(InventoryTransactionType.STOCK_ADJUSTMENT_OUT, 3, 100_000)
+            )
+        )
+
+        assertEquals(9L, state.quantity)
+        assertEquals(900_000L, state.valueRial)
+        assertEquals(100_000L, state.averageCostRial)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun stockAdjustmentCannotReduceBelowZero() {
+        WeightedAverageInventory.calculate(
+            listOf(
+                InventoryTransaction(InventoryTransactionType.PURCHASE, 2, 100_000),
+                InventoryTransaction(InventoryTransactionType.STOCK_ADJUSTMENT_OUT, 3, 100_000)
+            )
+        )
+    }
+
+    @Test(expected = ArithmeticException::class)
+    fun inventoryValueOverflowIsRejected() {
+        WeightedAverageInventory.calculate(
+            listOf(
+                InventoryTransaction(InventoryTransactionType.PURCHASE, Long.MAX_VALUE, 2)
+            )
+        )
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun negativeCostIsRejected() {
         WeightedAverageInventory.calculate(
