@@ -287,10 +287,27 @@ class MainActivity:ComponentActivity(){
 }
 
 @Composable fun BarcodeScannerDialog(onDismiss:()->Unit,onCode:(String)->Unit){
-    val context=LocalContext.current;val owner=LocalLifecycleOwner.current
+    val context=LocalContext.current
+    val owner=LocalLifecycleOwner.current
     var done by remember{mutableStateOf(false)}
+    var active by remember{mutableStateOf(true)}
+    var cameraError by remember{mutableStateOf("")}
     var hasPermission by remember { mutableStateOf(ContextCompat.checkSelfPermission(context,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> hasPermission = granted }
+    val latestOnCode by rememberUpdatedState(onCode)
+    val executor = remember { Executors.newSingleThreadExecutor() }
+    val scanner = remember { BarcodeScanning.getClient() }
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            active = false
+            cameraProvider?.unbindAll()
+            executor.shutdownNow()
+            scanner.close()
+        }
+    }
+
     AlertDialog(onDismissRequest=onDismiss,title={Text("اسکن بارکد")},text={
         Column{
             if(!hasPermission){
@@ -300,21 +317,34 @@ class MainActivity:ComponentActivity(){
                 AndroidView(factory={ctx->PreviewView(ctx).also{preview->
                     val future=ProcessCameraProvider.getInstance(ctx)
                     future.addListener({
+                        if(!active) return@addListener
                         try{
                             val provider=future.get()
+                            cameraProvider=provider
                             val analysis=ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()
-                            analysis.setAnalyzer(Executors.newSingleThreadExecutor()){proxy->
+                            analysis.setAnalyzer(executor){proxy->
                                 val media=proxy.image
                                 if(media==null){proxy.close();return@setAnalyzer}
-                                BarcodeScanning.getClient().process(InputImage.fromMediaImage(media,proxy.imageInfo.rotationDegrees))
-                                    .addOnSuccessListener{codes->if(!done)codes.firstOrNull()?.rawValue?.let{done=true;onCode(it)}}.addOnCompleteListener{proxy.close()}
+                                scanner.process(InputImage.fromMediaImage(media,proxy.imageInfo.rotationDegrees))
+                                    .addOnSuccessListener{codes->
+                                        if(active && !done){
+                                            codes.firstOrNull()?.rawValue?.let{code->
+                                                done=true
+                                                latestOnCode(code)
+                                            }
+                                        }
+                                    }
+                                    .addOnCompleteListener{proxy.close()}
                             }
                             provider.unbindAll()
                             provider.bindToLifecycle(owner,CameraSelector.DEFAULT_BACK_CAMERA,Preview.Builder().build().also{it.surfaceProvider=preview.surfaceProvider},analysis)
-                        }catch(_:SecurityException){}
+                        }catch(e:Exception){
+                            cameraError = "راه‌اندازی دوربین ناموفق بود. دسترسی دوربین و مجوزهای برنامه را بررسی کن."
+                        }
                     },ContextCompat.getMainExecutor(ctx))
                 }},Modifier.fillMaxWidth().height(260.dp))
                 Text("دوربین را روی بارکد بگیر؛ بعد از تشخیص خودکار بسته می‌شود.",fontSize=12.sp,color=Color.Gray)
+                if(cameraError.isNotBlank()) Text(cameraError,color=Color.Red,fontSize=12.sp)
             }
         }
     },confirmButton={TextButton(onClick=onDismiss){Text("بستن")}})
