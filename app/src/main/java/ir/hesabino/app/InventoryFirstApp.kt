@@ -212,7 +212,7 @@ fun InventoryFirstApp() {
         InventoryProductForm(
             product = editing,
             onDismiss = { showForm = false; editing = null },
-            onScan = { scanning = true; scanTarget = "form" },
+            onScan = { scanResult = ""; scanning = true; scanTarget = "form" },
             scannedCode = scanResult,
             onSave = { product ->
                 runCatching {
