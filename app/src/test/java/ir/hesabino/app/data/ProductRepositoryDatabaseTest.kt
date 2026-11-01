@@ -165,7 +165,7 @@ class ProductRepositoryDatabaseTest {
         val id = repository.insert(Product(name = "کالای دارای موجودی", purchasePriceRial = 10, stock = 1))
 
         assertThrows(ArithmeticException::class.java) {
-            repository.addPurchase(id, Long.MAX_VALUE, 10)
+            repository.addPurchase(id, Long.MAX_VALUE, 20)
         }
 
         val product = repository.getAll().single()
