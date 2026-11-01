@@ -26,7 +26,7 @@ import androidx.compose.ui.platform.*
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.viewinterop.AndroidView
@@ -175,8 +175,10 @@ class MainActivity:ComponentActivity(){
         }
     }
     if(addSupplier)SupplierDialog({addSupplier=false}){n,p->sr.findOrCreate(n,p);addSupplier=false;onChanged()}
-    if(addProduct && selected != null)NewProductForSupplierDialog(selected,{addProduct=false}){product,qty,invoiceNumber->
-        try{pur.saveNewProductInvoice(selected.id,invoiceNumber,product,qty);addProduct=false;onChanged()}catch(_:Exception){}
+    selected?.let { supplierForDialog ->
+        if(addProduct) NewProductForSupplierDialog(supplierForDialog,{addProduct=false}){product,qty,invoiceNumber->
+            try{pur.saveNewProductInvoice(supplierForDialog.id,invoiceNumber,product,qty);addProduct=false;onChanged()}catch(_:Exception){}
+        }
     }
     if(edit!=null)EditProductDialog(edit!!,{edit=null},{p->try{ProductRepository(ctx).update(p);edit=null;onChanged()}catch(_:Exception){}},{p->try{ProductRepository(ctx).delete(p.id);edit=null;onChanged()}catch(_:Exception){}})
     if(invoice!=null)InvoiceDetailDialog(invoice!!,pur,{invoice=null})
