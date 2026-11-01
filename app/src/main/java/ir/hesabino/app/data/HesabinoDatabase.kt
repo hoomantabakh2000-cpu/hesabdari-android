@@ -224,7 +224,8 @@ class ProductRepository(context: Context) {
             put("sale_price_rial", product.salePriceRial)
             put("min_stock", product.minStock)
         }
-        db.writableDatabase.update("products", values, "id = ?", arrayOf(product.id.toString()))
+        val updated = db.writableDatabase.update("products", values, "id = ?", arrayOf(product.id.toString()))
+        require(updated == 1) { "کالا پیدا نشد." }
     }
 
     fun addPurchase(productId: Long, quantity: Long, unitCostRial: Long) {
@@ -236,7 +237,9 @@ class ProductRepository(context: Context) {
     }
 
     fun setStock(productId: Long, newQuantity: Long) {
+        require(productId > 0L) { "شناسه کالا نامعتبر است." }
         require(newQuantity >= 0L) { "موجودی نمی‌تواند منفی باشد." }
+        require(getAll().any { it.id == productId }) { "کالا پیدا نشد." }
         val state = inventoryLedger.getCurrentState(productId)
         if (newQuantity == state.quantity) return
         val increase = newQuantity > state.quantity
@@ -268,8 +271,10 @@ class ProductRepository(context: Context) {
             "1"
         ).use { it.count }
 
+        require(id > 0L) { "شناسه کالا نامعتبر است." }
         require(count == 0) { "کالایی که گردش انبار دارد قابل حذف نیست." }
-        db.writableDatabase.delete("products", "id = ?", arrayOf(id.toString()))
+        val deleted = db.writableDatabase.delete("products", "id = ?", arrayOf(id.toString()))
+        require(deleted == 1) { "کالا پیدا نشد." }
     }
 
     fun close() = db.close()
