@@ -4,6 +4,9 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import ir.hesabino.app.domain.InventoryTransaction
+import ir.hesabino.app.domain.InventoryTransactionType
+import ir.hesabino.app.domain.WeightedAverageInventory
 
 class HesabinoDatabase(val context: Context) : SQLiteOpenHelper(
     context.applicationContext,
@@ -298,9 +301,7 @@ class InventoryTransactionRepository(private val db: HesabinoDatabase) {
     }
 
     fun getCurrentState(productId: Long): InventoryLedgerState {
-        var quantity = 0L
-        var value = 0L
-
+        val transactions = mutableListOf<InventoryTransaction>()
         db.readableDatabase.query(
             "inventory_transactions",
             arrayOf("type", "quantity", "unit_cost_rial"),
@@ -310,42 +311,16 @@ class InventoryTransactionRepository(private val db: HesabinoDatabase) {
             null,
             "created_at ASC, id ASC"
         ).use { c ->
-            val type = c.getColumnIndexOrThrow("type")
-            val qty = c.getColumnIndexOrThrow("quantity")
-            val cost = c.getColumnIndexOrThrow("unit_cost_rial")
-
             while (c.moveToNext()) {
-                val q = c.getLong(qty)
-                val unitCost = c.getLong(cost)
-                when (c.getString(type)) {
-                    "OPENING_BALANCE", "PURCHASE", "SALE_RETURN", "STOCK_ADJUSTMENT_IN" -> {
-                        quantity = Math.addExact(quantity, q)
-                        value = Math.addExact(value, Math.multiplyExact(q, unitCost))
-                    }
-                    "STOCK_ADJUSTMENT_OUT", "SALE" -> {
-                        require(q <= quantity) { "موجودی برای این فروش کافی نیست." }
-                        val average = if (quantity == 0L) 0L else Math.addExact(value, quantity / 2L) / quantity
-                        quantity = Math.subtractExact(quantity, q)
-                        value = Math.subtractExact(value, Math.multiplyExact(q, average))
-                        if (quantity == 0L) value = 0L
-                    }
-                    "PURCHASE_RETURN" -> {
-                        require(q <= quantity) { "موجودی برای برگشت خرید کافی نیست." }
-                        quantity = Math.subtractExact(quantity, q)
-                        value = Math.subtractExact(value, Math.multiplyExact(q, unitCost))
-                        if (quantity == 0L) value = 0L
-                    }
-                    else -> error("نوع تراکنش انبار ناشناخته است.")
-                }
+                transactions += InventoryTransaction(
+                    type = InventoryTransactionType.valueOf(c.getString(0)),
+                    quantity = c.getLong(1),
+                    unitCostRial = c.getLong(2)
+                )
             }
         }
-
-        return InventoryLedgerState(
-            quantity = quantity,
-            valueRial = value,
-            averageCostRial = if (quantity == 0L) 0L else Math.addExact(value, quantity / 2L) / quantity
-        )
-    }
+        val state = WeightedAverageInventory.calculate(transactions)
+        return InventoryLedgerState(state.quantity, state.valueRial, state.averageCostRial)
 }
 
 data class InventoryLedgerState(
