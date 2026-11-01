@@ -60,11 +60,16 @@ fun InventoryFirstApp() {
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Product?>(null) }
     var adjusting by remember { mutableStateOf<Product?>(null) }
+    var deleting by remember { mutableStateOf<Product?>(null) }
     var scanning by remember { mutableStateOf(false) }
     var scanTarget by remember { mutableStateOf("search") }
     var scanResult by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     val snackbar = remember { SnackbarHostState() }
+
+    DisposableEffect(repository) {
+        onDispose { repository.close() }
+    }
 
     fun reload() { products = repository.getAll() }
 
@@ -198,16 +203,30 @@ fun InventoryFirstApp() {
                                 product = product,
                                 onEdit = { editing = product; showForm = true },
                                 onAdjust = { adjusting = product },
-                                onDelete = {
-                                    runCatching { repository.delete(product.id); reload() }
-                                        .onFailure { error = it.message ?: "حذف کالا انجام نشد" }
-                                }
+                                onDelete = { deleting = product }
                             )
                         }
                     }
                 }
             }
         }
+    }
+
+    if (deleting != null) {
+        AlertDialog(
+            onDismissRequest = { deleting = null },
+            title = { Text("حذف کالا") },
+            text = { Text("از حذف «" + deleting!!.name + "» مطمئنی؟ اگر کالا گردش انبار داشته باشد، حذف آن امکان‌پذیر نیست.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val target = deleting!!
+                    runCatching { repository.delete(target.id); reload() }
+                        .onFailure { error = it.message ?: "حذف کالا انجام نشد" }
+                    deleting = null
+                }) { Text("حذف", color = Color(0xFFE05252)) }
+            },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text("انصراف") } }
+        )
     }
 
     if (showForm) {
