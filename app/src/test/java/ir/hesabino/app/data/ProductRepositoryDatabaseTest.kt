@@ -98,6 +98,21 @@ class ProductRepositoryDatabaseTest {
     }
 
     @Test
+    fun operationsOnMissingProductsAreRejected() {
+        val repository = ProductRepository(context)
+        assertThrows(IllegalArgumentException::class.java) {
+            repository.setStock(999L, 0L)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            repository.update(Product(id = 999L, name = "کالای حذف‌شده"))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            repository.delete(999L)
+        }
+        repository.close()
+    }
+
+    @Test
     fun insertRejectsNegativePricesAndMinimumStock() {
         val repository = ProductRepository(context)
         assertThrows(IllegalArgumentException::class.java) {
