@@ -113,6 +113,39 @@ class ProductRepositoryDatabaseTest {
     }
 
     @Test
+    fun reducingAndIncreasingStockKeepsWeightedInventoryValueCorrect() {
+        val repository = ProductRepository(context)
+        val id = repository.insert(Product(name = "شامپو", purchasePriceRial = 80_000, stock = 6))
+
+        repository.setStock(id, 4)
+        assertEquals(4L, repository.getAll().single().stock)
+        assertEquals(320_000L, repository.getInventoryValueRial())
+
+        repository.setStock(id, 5)
+        assertEquals(5L, repository.getAll().single().stock)
+        assertEquals(400_000L, repository.getInventoryValueRial())
+
+        repository.setStock(id, 0)
+        assertEquals(0L, repository.getAll().single().stock)
+        assertEquals(0L, repository.getInventoryValueRial())
+        repository.close()
+    }
+
+    @Test
+    fun productCanBeDeletedOnlyBeforeItHasInventoryMovements() {
+        val repository = ProductRepository(context)
+        val emptyId = repository.insert(Product(name = "کالای بدون موجودی"))
+        repository.delete(emptyId)
+        assertEquals(0, repository.getAll().size)
+
+        val stockedId = repository.insert(Product(name = "کالای دارای موجودی", purchasePriceRial = 25_000, stock = 2))
+        assertThrows(IllegalArgumentException::class.java) {
+            repository.delete(stockedId)
+        }
+        assertEquals(2L, repository.getAll().single().stock)
+        repository.close()
+    }
+    @Test
     fun insertRejectsNegativePricesAndMinimumStock() {
         val repository = ProductRepository(context)
         assertThrows(IllegalArgumentException::class.java) {
