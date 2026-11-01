@@ -5,6 +5,7 @@ data class Product(
     val name: String,
     val barcode: String = "",
     val unit: String = "عدد",
+    val category: String = "سایر",
     val purchasePriceRial: Long = 0L,
     val salePriceRial: Long = 0L,
     val stock: Long = 0L,
