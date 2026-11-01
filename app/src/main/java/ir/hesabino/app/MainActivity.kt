@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -288,12 +289,13 @@ class MainActivity:ComponentActivity(){
 @Composable fun BarcodeScannerDialog(onDismiss:()->Unit,onCode:(String)->Unit){
     val context=LocalContext.current;val owner=LocalLifecycleOwner.current
     var done by remember{mutableStateOf(false)}
-    val hasPermission=ContextCompat.checkSelfPermission(context,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED
+    var hasPermission by remember { mutableStateOf(ContextCompat.checkSelfPermission(context,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> hasPermission = granted }
     AlertDialog(onDismissRequest=onDismiss,title={Text("اسکن بارکد")},text={
         Column{
             if(!hasPermission){
                 Text("برای اسکن بارکد باید دسترسی دوربین فعال شود.",color=Color.Gray)
-                TextButton(onClick={if(context is Activity)(context as Activity).let{it.requestPermissions(arrayOf(Manifest.permission.CAMERA),7001)}}){Text("اجازه دسترسی به دوربین")}
+                TextButton(onClick={permissionLauncher.launch(Manifest.permission.CAMERA)}){Text("اجازه دسترسی به دوربین")}
             }else{
                 AndroidView(factory={ctx->PreviewView(ctx).also{preview->
                     val future=ProcessCameraProvider.getInstance(ctx)
