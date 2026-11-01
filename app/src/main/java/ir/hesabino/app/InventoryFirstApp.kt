@@ -59,6 +59,7 @@ fun InventoryFirstApp() {
     var stockFilter by remember { mutableStateOf("همه") }
     var showForm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Product?>(null) }
+    var adjusting by remember { mutableStateOf<Product?>(null) }
     var scanning by remember { mutableStateOf(false) }
     var scanTarget by remember { mutableStateOf("search") }
     var scanResult by remember { mutableStateOf("") }
@@ -196,6 +197,7 @@ fun InventoryFirstApp() {
                             InventoryProductCard(
                                 product = product,
                                 onEdit = { editing = product; showForm = true },
+                                onAdjust = { adjusting = product },
                                 onDelete = {
                                     runCatching { repository.delete(product.id); reload() }
                                         .onFailure { error = it.message ?: "حذف کالا انجام نشد" }
@@ -221,6 +223,16 @@ fun InventoryFirstApp() {
                     showForm = false
                     editing = null
                 }.onFailure { error = it.message ?: "ذخیره کالا انجام نشد" }
+            }
+        )
+    }
+    if (adjusting != null) {
+        InventoryStockAdjustmentDialog(
+            product = adjusting!!,
+            onDismiss = { adjusting = null },
+            onSave = { newStock ->
+                runCatching { repository.setStock(adjusting!!.id, newStock); reload(); adjusting = null }
+                    .onFailure { error = it.message ?: "اصلاح موجودی انجام نشد" }
             }
         )
     }
@@ -268,7 +280,7 @@ private fun InventoryMiniCard(title: String, value: String, accent: Color, modif
 }
 
 @Composable
-private fun InventoryProductCard(product: Product, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun InventoryProductCard(product: Product, onEdit: () -> Unit, onAdjust: () -> Unit, onDelete: () -> Unit) {
     val isOut = product.stock == 0L
     val isLow = !isOut && product.stock <= product.minStock
     val status = if (isOut) "ناموجود" else if (isLow) "کم‌موجود" else "موجود"
@@ -290,7 +302,8 @@ private fun InventoryProductCard(product: Product, onEdit: () -> Unit, onDelete:
                 InventoryInfoCell("قیمت فروش", inventoryToman(product.salePriceRial), Modifier.weight(1f))
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("حداقل موجودی: ${inventoryNumber(product.minStock)} ${product.unit}", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                Text("حداقل: ${inventoryNumber(product.minStock)} ${product.unit}", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                TextButton(onClick = onAdjust) { Text("اصلاح موجودی", fontSize = 10.sp) }
                 IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, "ویرایش", tint = HesabinoNavy) }
                 IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, "حذف", tint = Color(0xFFE05252)) }
             }
@@ -368,6 +381,39 @@ private fun InventoryProductForm(product: Product?, onDismiss: () -> Unit, onSca
                     ))
                 }
             }) { Text("ذخیره کالا") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } }
+    )
+}
+
+
+@Composable
+private fun InventoryStockAdjustmentDialog(product: Product, onDismiss: () -> Unit, onSave: (Long) -> Unit) {
+    var quantity by remember(product.id) { mutableStateOf(product.stock.toString()) }
+    var error by remember(product.id) { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("اصلاح موجودی کالا") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(product.name, fontWeight = FontWeight.Bold)
+                Text("موجودی ثبت‌شده: ${inventoryNumber(product.stock)} ${product.unit}", color = Color.Gray, fontSize = 12.sp)
+                OutlinedTextField(
+                    value = quantity,
+                    onValueChange = { quantity = inventoryDigits(it); error = "" },
+                    label = { Text("موجودی واقعی") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (error.isNotBlank()) Text(error, color = Color.Red, fontSize = 12.sp)
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val parsed = inventoryDigits(quantity).toLongOrNull()
+                if (parsed == null || parsed < 0L) error = "تعداد معتبر وارد کن" else onSave(parsed)
+            }) { Text("ثبت اصلاح موجودی") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } }
     )
